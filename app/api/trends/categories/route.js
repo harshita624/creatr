@@ -41,7 +41,6 @@ function parseRSS(xml) {
 
     if (!title) continue;
 
-    // Filter by freshness — keep only last 24h
     if (pub) {
       const age = Date.now() - new Date(pub).getTime();
       if (age > 24 * 3600 * 1000) continue;
@@ -53,7 +52,7 @@ function parseRSS(xml) {
   return items;
 }
 
-/* ── Build hot topics from RSS items ───────────────────────────── */
+/* ── Build hot topics from RSS items (Google News fallback path) ── */
 function buildHotTopics(allItems) {
   const seen = new Set();
   return allItems
@@ -64,7 +63,7 @@ function buildHotTopics(allItems) {
       return true;
     })
     .slice(0, 10)
-    .map((item, i) => ({
+    .map((item) => ({
       topic:       item.title,
       description: item.source ? `Source: ${item.source}` : "",
       location:    item.source || "",
@@ -74,14 +73,13 @@ function buildHotTopics(allItems) {
     }));
 }
 
-/* ── Extract hashtags from topics ──────────────────────────────── */
+/* ── Extract hashtags from topics (Google News fallback path) ───── */
 function buildHashtags(topics, category) {
   const words = topics
     .flatMap((t) => t.topic.split(/\s+/))
     .filter((w) => w.length > 4 && /^[a-zA-Z]/.test(w))
     .map((w) => w.replace(/[^a-zA-Z0-9]/g, ""));
 
-  // Count frequency
   const freq = {};
   for (const w of words) {
     const key = w.toLowerCase();
@@ -93,7 +91,6 @@ function buildHashtags(topics, category) {
     .slice(0, 15)
     .map(([w]) => w);
 
-  // Add category-specific defaults if not enough
   const catDefaults = {
     technology: ["tech", "innovation", "digital", "software", "AI"],
     design:     ["design", "UX", "creative", "typography", "branding"],
@@ -106,6 +103,37 @@ function buildHashtags(topics, category) {
   const defaults = catDefaults[category] || [];
   const combined = [...new Set([...tags, ...defaults])].slice(0, 15);
   return combined;
+}
+
+/* ── Map Flask's actual /analyze-category response to the UI shape ── */
+function mapMlResponse(mlData, country) {
+  const sources = mlData.research_sources || [];
+  const trendingWords = mlData.viral_patterns?.trending_words || [];
+  const stats = mlData.stats || {};
+
+  return {
+    hotTopics: sources.slice(0, 10).map((s) => ({
+      topic:       s.title,
+      description: `${s.content_angle || "Trend"} · ${s.subreddit || ""}`,
+      location:    s.subreddit || country,
+      volume:      (s.engagement?.upvotes || 0) + (s.engagement?.comments || 0),
+      growth:      Math.min(99, Math.round(s.virality_score || 0)),
+    })),
+    trendingHashtags: trendingWords,
+    insights: [
+      `Best time to post: ${stats.best_posting_time || "9:00-11:00"}`,
+      `Top-performing format right now: ${stats.top_format || "Tutorial"}`,
+      `${stats.total_sources || sources.length} live sources analyzed in the last 24 hours`,
+      mlData.viral_patterns?.use_questions
+        ? "Titles framed as questions are getting more traction"
+        : "Straightforward, direct titles are performing best",
+    ],
+    stats: {
+      activeTrends: stats.total_sources ?? sources.length,
+      trendingTags: trendingWords.length,
+      totalVolume:  `${stats.total_sources ?? sources.length} sources`,
+    },
+  };
 }
 
 export async function GET(request) {
@@ -122,33 +150,18 @@ export async function GET(request) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ country, region: country }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
 
     if (mlRes.ok) {
       const mlData = await mlRes.json();
-      return NextResponse.json({
-        hotTopics:        (mlData.trending_posts || []).slice(0, 10).map((p) => ({
-          topic:       p.title,
-          description: `Score: ${p.ml_trending_score?.toFixed(2) || 0}`,
-          location:    p.subreddit || country,
-          volume:      (p.score || 0) + (p.comments || 0),
-          growth:      Math.floor((p.time_decay || 0) * 100),
-        })),
-        trendingHashtags: mlData.predicted_hashtags || [],
-        insights:         mlData.ml_insights        || [],
-        stats: {
-          activeTrends: mlData.trending_posts?.length || 0,
-          trendingTags: mlData.predicted_hashtags?.length || 0,
-          totalVolume:  "ML Live",
-        },
-      });
+      return NextResponse.json(mapMlResponse(mlData, country));
     }
   } catch {
     // ML backend not running — fall through to Google News
   }
 
-  /* ── Google News RSS fallback (country-aware) ──────────────── */
+  /* ── Google News RSS fallback (country-aware) ────────────────── */
   try {
     const allItems = [];
 

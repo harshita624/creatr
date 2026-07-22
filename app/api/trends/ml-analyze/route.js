@@ -6,46 +6,50 @@ const ML_BACKEND_URL = process.env.ML_BACKEND_URL || 'http://localhost:5000';
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const region = searchParams.get('region') || 'global';
+    const category = searchParams.get('category') || 'technology';
+    const region   = searchParams.get('region') || 'IN';
 
-    const mlResponse = await fetch(`${ML_BACKEND_URL}/analyze-worldwide`, {
+    const mlResponse = await fetch(`${ML_BACKEND_URL}/analyze-category/${category}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ region }),
+      body: JSON.stringify({ country: region, region }),
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!mlResponse.ok) throw new Error('Trend backend failed');
-    
+
     const mlData = await mlResponse.json();
+    const sources = mlData.research_sources || [];
+    const stats = mlData.stats || {};
 
     const trends = {
       trendMetrics: {
-        postsAnalyzed: mlData.trending_posts?.length || 0,
-        topicsDetected: mlData.lda_topics?.length || 0,
-        clustersFound: mlData.cluster_topics?.length || 0,
+        postsAnalyzed: sources.length,
+        topicsDetected: mlData.content_blueprints?.length || 0,
         confidence: 94,
-        algorithmsUsed: ['TF-IDF', 'K-Means', 'LDA', 'Time-Decay']
+        algorithmsUsed: ['Time-Decay', 'Engagement-Weighted Virality'],
       },
-      
-      // ADD THIS: Real trending topics from Reddit
-      trendingTopics: mlData.trending_posts?.slice(0, 10).map(post => ({
-        title: post.title,
-        score: post.score,
-        comments: post.comments,
-        subreddit: post.subreddit,
-        trendScore: post.ml_trending_score
-      })) || [],
-      
-      predictedHashtags: mlData.predicted_hashtags || [],
-      clusters: mlData.cluster_topics || [],
-      ldaTopics: mlData.lda_topics || [],
-      insights: mlData.ml_insights || [],
-      
+
+      trendingTopics: sources.slice(0, 10).map((s) => ({
+        title: s.title,
+        score: s.engagement?.upvotes || 0,
+        comments: s.engagement?.comments || 0,
+        subreddit: s.subreddit,
+        trendScore: s.virality_score,
+      })),
+
+      predictedHashtags: mlData.viral_patterns?.trending_words || [],
+      contentBlueprints: mlData.content_blueprints || [],
+      insights: [
+        `Best time to post: ${stats.best_posting_time || '9:00-11:00'}`,
+        `Top-performing format: ${stats.top_format || 'Tutorial'}`,
+      ],
+
       stats: {
-        activeTrends: mlData.trending_posts?.length || 0,
-        trendingTags: mlData.predicted_hashtags?.length || 0,
-        totalVolume: '12.5M'
-      }
+        activeTrends: stats.total_sources ?? sources.length,
+        trendingTags: (mlData.viral_patterns?.trending_words || []).length,
+        totalVolume: `${stats.total_sources ?? sources.length} sources`,
+      },
     };
 
     return NextResponse.json(trends);
