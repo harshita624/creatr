@@ -31,17 +31,17 @@ export default function RootLayout({ children }) {
           <ClerkProvider
             publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
             appearance={{
-              baseTheme: ClerkTheme,
+              theme: ClerkTheme,
               variables: {
                 colorPrimary: "#9333ea", // Purple-600
                 colorBackground: "#ffffff",
-                colorText: "#1f2937", // Gray-800
-                colorTextSecondary: "#6b7280", // Gray-500
+                colorForeground: "#1f2937", // Gray-800
+                colorMutedForeground: "#6b7280", // Gray-500
                 colorDanger: "#ef4444", // Red-500
                 colorSuccess: "#10b981", // Emerald-500
                 colorNeutral: "#f3f4f6", // Gray-100
-                colorInputBackground: "#ffffff",
-                colorInputText: "#1f2937",
+                colorInput: "#ffffff",
+                colorInputForeground: "#1f2937",
                 fontSize: "1rem",
                 fontFamily: inter.style.fontFamily,
                 borderRadius: "0.75rem",

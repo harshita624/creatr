@@ -132,14 +132,12 @@ const Header = () => {
               <div className="relative group/user">
                 <div className="absolute inset-0 bg-gradient-to-r from-violet-400 to-fuchsia-400 blur-lg rounded-full opacity-0 group-hover/user:opacity-30 transition-opacity duration-300" />
                 <UserButton
-                  afterSignOutUrl="/"
                   appearance={{
                     elements: {
                       avatarBox:
                         "w-9 h-9 sm:w-10 sm:h-10 ring-2 ring-orange-200 ring-offset-2 ring-offset-white hover:ring-violet-300 transition-all duration-300",
                     },
-                  }}
-                />
+                  }} />
               </div>
             </div>
           </Authenticated>

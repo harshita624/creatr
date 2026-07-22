@@ -69,7 +69,6 @@ export default function DashboardLayout({ children }) {
         )}
         onClick={() => setSidebarOpen(false)}
       />
-
       {/* Sidebar */}
       <aside
         className={cn(
@@ -157,7 +156,6 @@ export default function DashboardLayout({ children }) {
           </Link>
         </div>
       </aside>
-
       {/* Main */}
       <div className="relative z-10 flex min-h-screen flex-col ml-0 lg:ml-[272px]">
         {/* Top header */}
@@ -184,13 +182,11 @@ export default function DashboardLayout({ children }) {
             </span>
             {mounted ? (
               <UserButton
-                afterSignOutUrl="/"
                 appearance={{
                   elements: {
                     avatarBox: "h-8 w-8 ring-2 ring-orange-200 ring-offset-1 hover:ring-violet-300 transition-all",
                   },
-                }}
-              />
+                }} />
             ) : (
               <div
                 aria-hidden="true"

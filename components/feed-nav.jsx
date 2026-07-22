@@ -94,10 +94,7 @@ export default function FeedNav() {
 
               {/* Avatar */}
               <div className="ml-1">
-                <UserButton
-                  afterSignOutUrl="/"
-                  appearance={{ elements: { avatarBox: "h-8 w-8" } }}
-                />
+                <UserButton appearance={{ elements: { avatarBox: "h-8 w-8" } }} />
               </div>
             </Authenticated>
 
@@ -112,7 +109,6 @@ export default function FeedNav() {
 
         </div>
       </header>
-
       {/* Click-away overlay for notifications */}
       {showNotifs && (
         <div
