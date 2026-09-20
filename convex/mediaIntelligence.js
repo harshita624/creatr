@@ -288,7 +288,22 @@ export const processJob = action({
       });
       if (!payload) throw new Error("Job payload missing");
 
-      const appUrl = process.env.CREATEK_APP_URL || "http://localhost:3002";
+      // FIX: this action runs on Convex's own infrastructure, not your
+      // Next.js server -- "localhost" here can never reach your app.
+      // CREATEK_APP_URL must be set in THIS Convex deployment's own
+      // environment variables (separate system from Vercel/.env -- set via
+      // `npx convex env set CREATEK_APP_URL https://your-app-domain.com`
+      // or the Convex dashboard) to your app's real public URL. Failing
+      // loudly here, instead of silently trying an unreachable localhost,
+      // puts the real cause directly in the job's error field.
+      const appUrl = process.env.CREATEK_APP_URL;
+      if (!appUrl) {
+        throw new Error(
+          "CREATEK_APP_URL is not set in this Convex deployment's environment variables. " +
+          "Set it to your app's public URL (npx convex env set CREATEK_APP_URL https://your-app.vercel.app), then retry."
+        );
+      }
+
       const response = await fetch(`${appUrl}/api/ai/media-intelligence`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -305,7 +320,8 @@ export const processJob = action({
       });
 
       if (!response.ok) {
-        throw new Error(`Media intelligence failed: ${response.status}`);
+        const bodyText = await response.text().catch(() => "");
+        throw new Error(`Media intelligence failed: ${response.status} ${bodyText.slice(0, 200)}`);
       }
 
       const data = await response.json();

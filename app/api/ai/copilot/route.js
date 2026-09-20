@@ -1,5 +1,7 @@
+// app/api/ai/copilot/route.js
 import { NextResponse } from "next/server";
-import { askOllama, fallbackCopilotReply } from "@/lib/ollama-server";
+import { generateTextWithFallback } from "@/lib/ai-provider";
+import { fallbackCopilotReply } from "@/lib/ollama-server";
 
 export async function POST(request) {
   let payload = {};
@@ -11,16 +13,10 @@ export async function POST(request) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
 
-    const reply = await askOllama(
-      [
-        {
-          role: "system",
-          content:
-            "You are CreateK Copilot, a concise creator assistant. Help with posts, hooks, SEO, audience strategy, trends, and dashboard decisions. Keep replies practical, warm, and under 130 words unless asked for more.",
-        },
-        {
-          role: "user",
-          content: `Current app context:
+    const { text: reply } = await generateTextWithFallback({
+      system:
+        "You are CreateK Copilot, a concise creator assistant. Help with posts, hooks, SEO, audience strategy, trends, and dashboard decisions. Keep replies practical, warm, and under 130 words unless asked for more.",
+      user: `Current app context:
 ${context || "General creator workflow"}
 
 Recent chat history:
@@ -31,10 +27,9 @@ ${history
 
 User question:
 ${message}`,
-        },
-      ],
-      { temperature: 0.62, numPredict: 500 }
-    );
+      temperature: 0.62,
+      maxTokens: 500,
+    });
 
     return NextResponse.json({ success: true, reply });
   } catch (error) {

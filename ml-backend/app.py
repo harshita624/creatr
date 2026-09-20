@@ -15,6 +15,14 @@ CORS(app)
 
 MAX_TREND_AGE_HOURS = 24
 
+# FIX: "CreatorSocialTrendBot" self-identifies as a bot in the UA string,
+# which is exactly what triggers silent rate-limiting/blocking from Reddit
+# and Google. A realistic browser UA is far less likely to be filtered.
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
 def strip_html(text):
     return re.sub(r'\s+', ' ', re.sub(r'<[^>]*>', ' ', text or '')).strip()
 
@@ -98,7 +106,7 @@ class TrendsEngine:
                 url = f'https://www.reddit.com/r/{subreddit}/hot.json?limit={limit}'
                 response = requests.get(
                     url,
-                    headers={'User-Agent': 'Mozilla/5.0 CreatorSocialTrendBot/1.0'},
+                    headers={'User-Agent': BROWSER_USER_AGENT},
                     timeout=8
                 )
                 
@@ -146,7 +154,7 @@ class TrendsEngine:
             try:
                 response = requests.get(
                     url,
-                    headers={'User-Agent': 'Mozilla/5.0 CreatorSocialTrendBot/1.0'},
+                    headers={'User-Agent': BROWSER_USER_AGENT},
                     timeout=10
                 )
                 response.raise_for_status()
@@ -246,7 +254,6 @@ class TrendsEngine:
         if not posts:
             return self.get_empty_response(category)
         
-        # Calculate virality scores
         sources = []
         for post in posts:
             hours_old = (datetime.now().timestamp() - post['created_utc']) / 3600
@@ -269,16 +276,10 @@ class TrendsEngine:
                 'content_angle': self.get_content_angle(post['title'])
             })
         
-        # Sort by virality
         sources = sorted(sources, key=lambda x: x['virality_score'], reverse=True)
-        
-        # Extract patterns
         patterns = self.extract_patterns(posts)
-        
-        # Generate content ideas
         blueprints = self.generate_ideas(sources, patterns, category)
         
-        # Calculate stats
         stats = {
             'total_sources': len(posts),
             'avg_engagement': float(np.mean([p['score'] for p in posts])),
@@ -317,7 +318,6 @@ class TrendsEngine:
         for post in posts:
             title = post['title'].lower()
             
-            # Detect formats
             if title.startswith('how'):
                 formats['Tutorial'] += post['score']
             if any(str(i) in title for i in range(1, 11)):
@@ -327,7 +327,6 @@ class TrendsEngine:
             if post['is_video']:
                 formats['Video'] += post['score']
             
-            # Extract keywords
             clean_words = re.findall(r'\b[a-z]{4,}\b', title)
             for word in clean_words:
                 words[word] += 1
@@ -536,7 +535,6 @@ class TrendsEngine:
         common = [word for word, _ in words.most_common(8)]
         return [category] + common[:8]
 
-# Initialize
 engine = TrendsEngine()
 
 @app.route('/analyze-category/<category>', methods=['GET', 'POST'])

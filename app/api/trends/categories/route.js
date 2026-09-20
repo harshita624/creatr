@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 
 const ML_BACKEND_URL = process.env.ML_BACKEND_URL || "http://localhost:5000";
 
+// A generic "bot"-labeled User-Agent is a common trigger for Google to
+// silently rate-limit or block RSS requests. A realistic browser UA is
+// far less likely to be filtered.
+const BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
 /* ── Country → Google News locale config ───────────────────────── */
 const COUNTRY_CONFIG = {
   IN: { hl: "en-IN", gl: "IN", ceid: "IN:en"    },
@@ -33,7 +39,7 @@ function parseRSS(xml) {
   const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
 
   for (const item of itemMatches.slice(0, 15)) {
-    const title = item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>|<title>(.*?)<\/title>/)?.[1] ||
+    const title = item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] ||
                   item.match(/<title>(.*?)<\/title>/)?.[1] || "";
     const link  = item.match(/<link>(.*?)<\/link>/)?.[1] || "";
     const pub   = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || "";
@@ -41,9 +47,14 @@ function parseRSS(xml) {
 
     if (!title) continue;
 
+    // FIX: the query now asks Google for recent items directly (when:1d,
+    // below), so this is now just a generous safety net (72h) for feed
+    // lag, not the sole recency mechanism — previously a hard 24h cutoff
+    // with no recency hint in the query could empty out the whole result
+    // set for quieter categories.
     if (pub) {
       const age = Date.now() - new Date(pub).getTime();
-      if (age > 24 * 3600 * 1000) continue;
+      if (age > 72 * 3600 * 1000) continue;
     }
 
     items.push({ title: title.replace(/\s*-\s*[^-]+$/, "").trim(), link, source, pub });
@@ -136,6 +147,27 @@ function mapMlResponse(mlData, country) {
   };
 }
 
+/* ── Fetch one Google News RSS query, tolerant of individual failures ── */
+async function fetchRssQuery(query, country, locale) {
+  const withRecency = `${query} when:1d`;
+  const encoded = encodeURIComponent(
+    `${withRecency} ${country === "IN" ? "India" : country === "US" ? "USA" : ""}`.trim()
+  );
+  const rssUrl = `https://news.google.com/rss/search?q=${encoded}&hl=${locale.hl}&gl=${locale.gl}&ceid=${locale.ceid}`;
+
+  try {
+    const res = await fetch(rssUrl, {
+      headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/rss+xml, application/xml, text/xml" },
+      signal: AbortSignal.timeout(7000),
+    });
+    if (!res.ok) return [];
+    const xml = await res.text();
+    return parseRSS(xml);
+  } catch {
+    return [];
+  }
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const category = searchParams.get("category") || "technology";
@@ -144,7 +176,7 @@ export async function GET(request) {
   const locale = COUNTRY_CONFIG[country] || COUNTRY_CONFIG.IN;
   const queries = CATEGORY_QUERIES[category] || CATEGORY_QUERIES.technology;
 
-  /* ── Try ML backend first ──────────────────────────────────── */
+  /* ── Try ML backend first (optional — only relevant if you've deployed trends_backend.py separately and set ML_BACKEND_URL) ── */
   try {
     const mlRes = await fetch(`${ML_BACKEND_URL}/analyze-category/${category}`, {
       method: "POST",
@@ -158,31 +190,18 @@ export async function GET(request) {
       return NextResponse.json(mapMlResponse(mlData, country));
     }
   } catch {
-    // ML backend not running — fall through to Google News
+    // ML backend not deployed/reachable — fall through to Google News, which is the default path for most deployments.
   }
 
-  /* ── Google News RSS fallback (country-aware) ────────────────── */
+  /* ── Google News RSS fallback (country-aware, this is the default path) ── */
   try {
-    const allItems = [];
-
-    for (const q of queries.slice(0, 2)) {
-      const encoded = encodeURIComponent(`${q} ${country === "IN" ? "India" : country === "US" ? "USA" : ""}`);
-      const rssUrl  = `https://news.google.com/rss/search?q=${encoded}&hl=${locale.hl}&gl=${locale.gl}&ceid=${locale.ceid}`;
-
-      try {
-        const res = await fetch(rssUrl, {
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; bot/1.0)" },
-          signal: AbortSignal.timeout(6000),
-        });
-        if (res.ok) {
-          const xml   = await res.text();
-          const items = parseRSS(xml);
-          allItems.push(...items);
-        }
-      } catch {
-        // skip failed query
-      }
-    }
+    // FIX: was sequential awaits in a for-loop; now runs in parallel and
+    // tolerates individual query failures instead of one bad query
+    // taking down the whole request.
+    const results = await Promise.all(
+      queries.slice(0, 2).map((q) => fetchRssQuery(q, country, locale))
+    );
+    const allItems = results.flat();
 
     if (allItems.length === 0) throw new Error("No RSS data");
 

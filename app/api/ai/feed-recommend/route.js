@@ -1,5 +1,7 @@
+// app/api/ai/feed-recommendations/route.js
 import { NextResponse } from "next/server";
-import { askOllama, rankPostsLocally, stripHtml } from "@/lib/ollama-server";
+import { generateJsonWithFallback } from "@/lib/ai-provider";
+import { rankPostsLocally, stripHtml } from "@/lib/ollama-server";
 
 export async function POST(request) {
   let payload = {};
@@ -19,26 +21,18 @@ export async function POST(request) {
       },
     }));
 
-    const reply = await askOllama(
-      [
-        {
-          role: "system",
-          content:
-            "You are an AI feed recommender. Return only valid compact JSON with this exact shape: {\"recommendations\":[{\"id\":\"post id\",\"score\":0-100,\"why\":\"max 8 words\"}]}. No markdown. No extra keys.",
-        },
-        {
-          role: "user",
-          content: `User intent: ${intent}
+    const { json } = await generateJsonWithFallback({
+      system:
+        'You are an AI feed recommender. Return only valid compact JSON with this exact shape: {"recommendations":[{"id":"post id","score":0-100,"why":"max 8 words"}]}. No markdown. No extra keys.',
+      user: `User intent: ${intent}
 
 Posts:
 ${JSON.stringify(compactPosts)}`,
-        },
-      ],
-      { temperature: 0.1, numPredict: 320, format: "json" }
-    );
+      temperature: 0.1,
+      maxTokens: 320,
+    });
 
-    const recommendations = parseJson(reply).recommendations || [];
-    return NextResponse.json({ success: true, recommendations });
+    return NextResponse.json({ success: true, recommendations: json.recommendations || [] });
   } catch (error) {
     console.error("Feed recommendation error:", error.message);
     return NextResponse.json({
@@ -46,25 +40,5 @@ ${JSON.stringify(compactPosts)}`,
       fallback: true,
       recommendations: rankPostsLocally(payload.posts, payload.intent),
     });
-  }
-}
-
-function parseJson(value) {
-  const clean = (value || "").replace(/```json|```/g, "").trim();
-  const start = clean.indexOf("{");
-  const end = clean.lastIndexOf("}");
-  const jsonText = start >= 0 && end >= 0 ? clean.slice(start, end + 1) : clean;
-  try {
-    return JSON.parse(jsonText);
-  } catch {
-    const recommendations = [];
-    const objectMatches = jsonText.match(/\{[^{}]*"id"[^{}]*\}/g) || [];
-    for (const item of objectMatches) {
-      try {
-        const parsed = JSON.parse(item);
-        if (parsed.id) recommendations.push(parsed);
-      } catch {}
-    }
-    return { recommendations };
   }
 }

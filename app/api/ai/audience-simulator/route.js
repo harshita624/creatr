@@ -1,9 +1,7 @@
+// app/api/ai/audience-simulator/route.js
 import { NextResponse } from "next/server";
-import {
-  askOllama,
-  heuristicAudienceSimulation,
-  stripHtml,
-} from "@/lib/ollama-server";
+import { generateJsonWithFallback } from "@/lib/ai-provider";
+import { heuristicAudienceSimulation, stripHtml } from "@/lib/ollama-server";
 
 export async function POST(request) {
   let text = "";
@@ -16,16 +14,10 @@ export async function POST(request) {
       return NextResponse.json({ error: "Text is required" }, { status: 400 });
     }
 
-    const response = await askOllama(
-      [
-        {
-          role: "system",
-          content:
-            "You are an audience simulator for a creator platform. Return strict JSON only. No markdown.",
-        },
-        {
-          role: "user",
-          content: `Analyze this draft and simulate audience reactions.
+    const { json: parsed } = await generateJsonWithFallback({
+      system:
+        "You are an audience simulator for a creator platform. Return strict JSON only. No markdown.",
+      user: `Analyze this draft and simulate audience reactions.
 
 Return this exact JSON shape:
 {
@@ -42,12 +34,10 @@ Return this exact JSON shape:
 
 Draft:
 ${stripHtml(text).slice(0, 4500)}`,
-        },
-      ],
-      { temperature: 0.45, numPredict: 700 }
-    );
+      temperature: 0.45,
+      maxTokens: 700,
+    });
 
-    const parsed = parseJson(response);
     return NextResponse.json({ success: true, simulation: parsed });
   } catch (error) {
     console.error("Audience simulator error:", error.message);
@@ -57,12 +47,4 @@ ${stripHtml(text).slice(0, 4500)}`,
       simulation: heuristicAudienceSimulation(text),
     });
   }
-}
-
-function parseJson(value) {
-  const clean = value.replace(/```json|```/g, "").trim();
-  const start = clean.indexOf("{");
-  const end = clean.lastIndexOf("}");
-  const json = start >= 0 && end >= 0 ? clean.slice(start, end + 1) : clean;
-  return JSON.parse(json);
 }
