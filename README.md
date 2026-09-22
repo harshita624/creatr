@@ -33,31 +33,31 @@ Results are exposed through a live analytics dashboard in the main app.
 
 ## Architecture
                 ┌──────────────────────┐
-                │       Frontend        │
-                │       Next.js         │
-                └──────────┬────────────┘
+                │       Frontend       │
+                │       Next.js        │
+                └──────────┬───────────┘
                            │
             ┌──────────────┼───────────────┐
-            │                               │
-            ▼                               ▼
+            │                              │
+            ▼                              ▼
 ┌───────────────────────┐      ┌─────────────────────────┐
-│        Convex          │      │   Flask Analytics       │
-│  Real-time backend     │      │   Microservice          │
-│  Live subscriptions    │      │   TF-IDF → K-Means → LDA│
-│  JWT-secured identity  │      │   Reddit trend discovery│
-└──────────┬──────────────┘      └─────────────┬────────────┘
+│        Convex         │      │  Flask Analytics        │
+│  Real-time backend    │      │  Microservice           │
+│  Live subscriptions   │      │  TF-IDF → K-Means → LDA │
+│  JWT-secured identity │      │  Reddit trend discovery │
+└──────────┬────────────┘      └─────────────┬───────────┘
            │                                    │
            ▼                                    ▼
 ┌───────────────────────┐          ┌─────────────────────────┐
-│       Inngest          │          │   Live Analytics         │
-│  Background workflows  │          │   Dashboard               │
+│       Inngest         │          │     Live Analytics      │
+│  Background workflows │          │        Dashboard        │
 └───────────────────────┘          └─────────────────────────┘
 
-┌─────────────────────────────────────────────────────┐
-│              Browser-Native Creative Tools            │
-│   Canvas video editor · Web Audio podcast studio      │
-│           LiveKit WebRTC livestream room               │
-└─────────────────────────────────────────────────────┘
+    ┌─────────────────────────────────────────────────────┐
+    │              Browser-Native Creative Tools          │
+    │   Canvas video editor · Web Audio podcast studio    │
+    │           LiveKit WebRTC livestream room            │
+    └─────────────────────────────────────────────────────┘
 
 ## Tech Stack
 
