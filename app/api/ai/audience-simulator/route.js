@@ -1,7 +1,7 @@
 // app/api/ai/audience-simulator/route.js
 import { NextResponse } from "next/server";
 import { generateJsonWithFallback } from "@/lib/ai-provider";
-import { heuristicAudienceSimulation, stripHtml } from "@/lib/ollama-server";
+import { heuristicAudienceSimulation, stripHtml } from "@/lib/ai-utils";
 
 export async function POST(request) {
   let text = "";

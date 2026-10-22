@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { SignInButton } from "@clerk/nextjs";
+import LivestreamViewer from "@/components/livestream-viewer";
+import PodcastAudioPlayer from "@/components/podcast-audio-player";
 
 /* ── Slide styles (matches the editor) ────────────────────────────── */
 const SLIDE_STYLES = {
@@ -215,6 +217,7 @@ export default function PublicPostPage() {
   const slides        = post.carouselSlides ?? [];
   const totalSlides   = slides.length;
   const isVideo       = post.contentType === "reel" || post.contentType === "video";
+  const isLivestream  = post.contentType === "livestream";
   const isPodcast     = post.contentType === "podcast";
   const caption       = post.title || "";
 
@@ -240,10 +243,11 @@ export default function PublicPostPage() {
           <div className="w-full lg:flex-1">
             <div
               className="relative overflow-hidden bg-black lg:rounded-2xl"
-              style={{ aspectRatio: "1/1" }}
+              style={{ aspectRatio: isLivestream ? "16/9" : "1/1" }}
             >
-              {/* Carousel */}
-              {isCarousel && totalSlides > 0 ? (
+              {isLivestream ? (
+                <LivestreamViewer postId={post._id} />
+              ) : isCarousel && totalSlides > 0 ? (
                 <>
                   <SlideCard
                     slide={slides[carouselIdx]}
@@ -317,7 +321,7 @@ export default function PublicPostPage() {
                   <Music2 className="h-4 w-4 text-amber-500" />
                   <p className="text-sm font-semibold text-slate-900">Listen to episode</p>
                 </div>
-                <audio src={post.mediaUrl} controls className="w-full rounded-xl" />
+                <PodcastAudioPlayer src={post.mediaUrl} className="w-full rounded-xl" />
               </div>
             )}
 

@@ -1,7 +1,7 @@
 // app/api/ai/feed-recommendations/route.js
 import { NextResponse } from "next/server";
 import { generateJsonWithFallback } from "@/lib/ai-provider";
-import { rankPostsLocally, stripHtml } from "@/lib/ollama-server";
+import { rankPostsLocally, stripHtml } from "@/lib/ai-utils";
 
 export async function POST(request) {
   let payload = {};

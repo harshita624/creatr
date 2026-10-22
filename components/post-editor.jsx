@@ -50,7 +50,7 @@ const stripHtml = (value = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
-const PostEditor = ({ initialData = null, initialContentType = "article", mode = "create" }) => {
+const PostEditor = ({ initialData = null, initialContentType = "article", initialTitle = "", mode = "create" }) => {
   const router = useRouter();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -67,7 +67,7 @@ const PostEditor = ({ initialData = null, initialContentType = "article", mode =
   const form = useForm({
     resolver: zodResolver(postSchema),
     defaultValues: {
-      title: initialData?.title || "",
+      title: initialData?.title || initialTitle,
       content: initialData?.content || "",
       category: initialData?.category || "",
       tags: initialData?.tags || [],

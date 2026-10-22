@@ -141,14 +141,17 @@ export default function CreatorCopilot() {
         body: JSON.stringify({ message: msg, context, history: messages.slice(-10) }),
       });
       const data = await res.json();
+      if (!res.ok || !data?.reply) {
+        throw new Error(data?.error || "The assistant could not respond. Please try again.");
+      }
       updateActive((c) => ({
         ...c,
-        messages: [...nextMsgs, { role: "assistant", content: data.reply || "No reply." }],
+        messages: [...nextMsgs, { role: "assistant", content: data.reply }],
       }));
-    } catch {
+    } catch (error) {
       updateActive((c) => ({
         ...c,
-        messages: [...nextMsgs, { role: "assistant", content: "Couldn't reach the helper. Try again." }],
+        messages: [...nextMsgs, { role: "assistant", content: error.message || "Couldn't reach the helper. Try again." }],
       }));
     } finally {
       setLoading(false);

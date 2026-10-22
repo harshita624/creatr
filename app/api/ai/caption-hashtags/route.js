@@ -1,7 +1,7 @@
 // app/api/ai/caption-hashtags/route.js
 import { NextResponse } from "next/server";
 import { generateJsonWithFallback } from "@/lib/ai-provider";
-import { stripHtml } from "@/lib/ollama-server";
+import { stripHtml } from "@/lib/ai-utils";
 
 export async function POST(request) {
   try {

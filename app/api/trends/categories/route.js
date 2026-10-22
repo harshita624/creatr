@@ -78,8 +78,8 @@ function buildHotTopics(allItems) {
       topic:       item.title,
       description: item.source ? `Source: ${item.source}` : "",
       location:    item.source || "",
-      volume:      Math.floor(Math.random() * 5000) + 500,
-      growth:      Math.floor(Math.random() * 60) + 5,
+      volume:      0,
+      growth:      0,
       promoted:    false,
     }));
 }
@@ -187,7 +187,10 @@ export async function GET(request) {
 
     if (mlRes.ok) {
       const mlData = await mlRes.json();
-      return NextResponse.json(mapMlResponse(mlData, country));
+      const mapped = mapMlResponse(mlData, country);
+      if (mapped.hotTopics.length || mapped.trendingHashtags.length) {
+        return NextResponse.json(mapped);
+      }
     }
   } catch {
     // ML backend not deployed/reachable — fall through to Google News, which is the default path for most deployments.

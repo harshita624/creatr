@@ -8,6 +8,7 @@ import { Flag, Image as ImageIcon, Loader2, Pause, Play, Save, Scissors, Upload,
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { uploadToImageKit } from "@/lib/imagekit";
+import { resolvePodcastUrl } from "@/app/actions/media";
 
 function formatTime(seconds = 0) {
   if (!Number.isFinite(seconds)) return "0:00";
@@ -40,6 +41,21 @@ export default function PodcastStudio({ postId, mediaUrl, onEnsureDraft }) {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [playableUrl, setPlayableUrl] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const audioFile = /\.(mp3|m4a|aac|wav|ogg|opus|flac)(?:$|[?#])/i.test(mediaUrl || "");
+    if (!mediaUrl) { setPlayableUrl(""); return () => { cancelled = true; }; }
+    if (audioFile) { setPlayableUrl(mediaUrl); return () => { cancelled = true; }; }
+    setPlayableUrl("");
+    resolvePodcastUrl(mediaUrl).then((result) => {
+      if (cancelled) return;
+      if (result.success) setPlayableUrl(result.url);
+      else toast.error(result.error || "Could not load podcast episode");
+    }).catch(() => { if (!cancelled) toast.error("Could not load podcast episode"); });
+    return () => { cancelled = true; };
+  }, [mediaUrl]);
 
   useEffect(() => {
     if (saved === undefined || hydrated) return;
@@ -53,7 +69,7 @@ export default function PodcastStudio({ postId, mediaUrl, onEnsureDraft }) {
   }, [saved, hydrated]);
 
   useEffect(() => {
-    if (!mediaUrl) return;
+    if (!playableUrl) return;
     let cancelled = false;
 
     async function computePeaks() {
@@ -62,7 +78,7 @@ export default function PodcastStudio({ postId, mediaUrl, onEnsureDraft }) {
       try {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContextClass();
-        const response = await fetch(mediaUrl);
+        const response = await fetch(playableUrl);
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
         if (cancelled) return;
@@ -92,7 +108,7 @@ export default function PodcastStudio({ postId, mediaUrl, onEnsureDraft }) {
     return () => {
       cancelled = true;
     };
-  }, [mediaUrl]);
+  }, [playableUrl]);
 
   useEffect(() => {
     if (duration > 0 && trimEnd === 0) setTrimEnd(duration);
@@ -137,7 +153,7 @@ export default function PodcastStudio({ postId, mediaUrl, onEnsureDraft }) {
   const togglePlay = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (audio.paused) audio.play();
+    if (audio.paused) audio.play().catch(() => toast.error("Could not play this podcast episode"));
     else audio.pause();
   };
 
@@ -237,7 +253,7 @@ export default function PodcastStudio({ postId, mediaUrl, onEnsureDraft }) {
 
       <audio
         ref={audioRef}
-        src={mediaUrl}
+        src={playableUrl || undefined}
         onLoadedMetadata={handleLoadedMetadata}
         onTimeUpdate={handleTimeUpdate}
         onPlay={() => setIsPlaying(true)}

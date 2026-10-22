@@ -12,7 +12,6 @@ async function testGeminiAPI() {
   }
 
   console.log("✅ API Key found (length:", apiKey.length, ")");
-  console.log("First 10 chars:", apiKey.substring(0, 10) + "...\n");
 
   // Test 1: List available models
   console.log("TEST 1: Listing available models...\n");
@@ -45,11 +44,7 @@ async function testGeminiAPI() {
 
   // Test 2: Try different model endpoints
   const modelsToTest = [
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
-    'gemini-pro',
-    'models/gemini-1.5-flash',
-    'models/gemini-1.5-pro'
+    process.env.GEMINI_MODEL || 'gemini-3.8-flash'
   ];
 
   console.log("TEST 2: Testing model endpoints...\n");

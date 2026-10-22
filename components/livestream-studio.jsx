@@ -6,15 +6,18 @@ import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import { Loader2, Mic, MicOff, Radio, Users, Video, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { uploadToImageKit } from "@/lib/imagekit";
 
-export default function LivestreamStudio({ postId, onEnsureDraft }) {
+export default function LivestreamStudio({ postId, onEnsureDraft, onRecordingSaved }) {
   const videoRef = useRef(null);
   const roomRef = useRef(null);
+  const activePostIdRef = useRef(postId || null);
 
   const session = useQuery(api.livestreams.getSessionForPost, postId ? { postId } : "skip");
   const goLiveMutation = useMutation(api.livestreams.goLive);
   const endStreamMutation = useMutation(api.livestreams.endStream);
   const recordPeakViewers = useMutation(api.livestreams.recordPeakViewers);
+  const updatePost = useMutation(api.posts.update);
 
   const [connecting, setConnecting] = useState(false);
   const [isLive, setIsLive] = useState(false);
@@ -22,6 +25,9 @@ export default function LivestreamStudio({ postId, onEnsureDraft }) {
   const [cameraOn, setCameraOn] = useState(true);
   const [viewerCount, setViewerCount] = useState(0);
   const [error, setError] = useState("");
+  const [savingRecording, setSavingRecording] = useState(false);
+  const recorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
 
   useEffect(() => {
     return () => {
@@ -33,8 +39,18 @@ export default function LivestreamStudio({ postId, onEnsureDraft }) {
     setConnecting(true);
     setError("");
     try {
+      if (typeof MediaRecorder === "undefined") {
+        throw new Error("This browser cannot record livestreams. Try the latest Chrome or Edge.");
+      }
+      const mimeType = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
+        .find((type) => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) {
+        throw new Error("This browser cannot record livestreams. Try the latest Chrome or Edge.");
+      }
+
       const ensuredId = postId || (await onEnsureDraft?.());
       if (!ensuredId) throw new Error("Save the draft first");
+      activePostIdRef.current = ensuredId;
 
       const { roomName } = await goLiveMutation({ postId: ensuredId });
 
@@ -67,6 +83,18 @@ export default function LivestreamStudio({ postId, onEnsureDraft }) {
         }
       }
 
+      const recordingStream = new MediaStream(tracks.map((track) => track.mediaStreamTrack));
+      recordedChunksRef.current = [];
+      const recorder = new MediaRecorder(recordingStream, { mimeType, videoBitsPerSecond: 900_000, audioBitsPerSecond: 96_000 });
+      recorder.ondataavailable = (event) => {
+        if (event.data?.size) recordedChunksRef.current.push(event.data);
+      };
+      recorder.onerror = (event) => {
+        console.error("Livestream recording error:", event.error);
+      };
+      recorder.start(1000);
+      recorderRef.current = recorder;
+
       setIsLive(true);
       toast.success("You're live");
     } catch (err) {
@@ -78,18 +106,54 @@ export default function LivestreamStudio({ postId, onEnsureDraft }) {
   };
 
   const handleEndStream = async () => {
+    setSavingRecording(true);
     try {
+      const activePostId = activePostIdRef.current;
+      const recorder = recorderRef.current;
+      let recordingBlob = null;
+      if (recorder && recorder.state !== "inactive") {
+        recordingBlob = await new Promise((resolve) => {
+          recorder.addEventListener("stop", () => {
+            const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || "video/webm" });
+            resolve(blob.size ? blob : null);
+          }, { once: true });
+          recorder.stop();
+        });
+      }
+      recorderRef.current = null;
+
       roomRef.current?.disconnect();
       roomRef.current = null;
-      if (postId) {
-        await recordPeakViewers({ postId, viewerCount });
-        await endStreamMutation({ postId });
+      if (activePostId) {
+        await recordPeakViewers({ postId: activePostId, viewerCount });
+        await endStreamMutation({ postId: activePostId });
       }
       setIsLive(false);
       setViewerCount(0);
-      toast.success("Stream ended");
+
+      if (recordingBlob && activePostId) {
+        const recordingFile = new File([recordingBlob], `livestream-${activePostId}-${Date.now()}.webm`, { type: recordingBlob.type || "video/webm" });
+        const uploaded = await uploadToImageKit(recordingFile, recordingFile.name, "creator-media");
+        if (!uploaded.success) throw new Error(uploaded.error || "The stream ended, but its recording could not be uploaded");
+
+        await updatePost({
+          id: activePostId,
+          contentType: "video",
+          mediaUrl: uploaded.data.url,
+          ...(uploaded.data.thumbnailUrl ? { featuredImage: uploaded.data.thumbnailUrl } : {}),
+        });
+        onRecordingSaved?.({ url: uploaded.data.url, thumbnailUrl: uploaded.data.thumbnailUrl });
+        toast.success("Stream ended and saved as a video");
+      } else {
+        toast.success("Stream ended");
+      }
+      activePostIdRef.current = null;
     } catch (err) {
-      toast.error(err.message || "Failed to end stream cleanly");
+      setIsLive(false);
+      setViewerCount(0);
+      toast.error(err.message || "Stream ended, but its recording could not be saved");
+    } finally {
+      setSavingRecording(false);
     }
   };
 
@@ -167,8 +231,8 @@ export default function LivestreamStudio({ postId, onEnsureDraft }) {
               {cameraOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4 text-red-500" />}
               {cameraOn ? "Camera off" : "Camera on"}
             </Button>
-            <Button onClick={handleEndStream} variant="outline" className="border-red-100 text-red-500 hover:bg-red-50">
-              End stream
+            <Button onClick={handleEndStream} disabled={savingRecording} variant="outline" className="border-red-100 text-red-500 hover:bg-red-50">
+              {savingRecording ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving video…</> : "End stream"}
             </Button>
           </>
         )}

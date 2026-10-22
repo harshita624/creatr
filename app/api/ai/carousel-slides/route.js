@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { stripHtml } from "@/lib/ollama-server";
+import { stripHtml } from "@/lib/ai-utils";
+import { generateTextWithFallback } from "@/lib/ai-provider";
 
 const VALID_LAYOUTS   = new Set(["cover", "split", "quote", "stat", "cta"]);
 const VALID_TEMPLATES = new Set(["minimal", "bold", "gradient", "card", "gradient-dark", "gradient-light"]);
@@ -239,63 +240,17 @@ JSON array (${numSlides} slides):`;
 /* ── Try AI providers ────────────────────────────────────────────── */
 async function tryAI(title, content, numSlides) {
   const prompt = buildPrompt(title, content, numSlides);
-
-  // Groq
-  if (process.env.GROQ_API_KEY) {
-    try {
-      const Groq = (await import("groq-sdk")).default;
-      const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-      const res  = await groq.chat.completions.create({
-        model:       process.env.GROQ_MODEL || "llama-3.1-8b-instant",
-        messages:    [{ role: "user", content: prompt }],
-        temperature: 0.4,
-        max_tokens:  1200,
-      });
-      const text = res.choices?.[0]?.message?.content || "";
-      const data = robustParse(text);
-      const arr  = Array.isArray(data) ? data : (data.slides || Object.values(data)[0] || []);
-      if (Array.isArray(arr) && arr.length >= 2) return { slides: arr, provider: "groq" };
-    } catch (e) { console.error("Groq carousel:", e.message); }
-  }
-
-  // Gemini
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const { GoogleGenerativeAI } = await import("@google/generative-ai");
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({
-        model:            process.env.GEMINI_MODEL || "gemini-1.5-flash",
-        generationConfig: {
-          temperature:      0.4,
-          maxOutputTokens:  1200,
-          responseMimeType: "application/json",
-        },
-      });
-      const r    = await model.generateContent(prompt);
-      const text = r.response.text();
-      const data = robustParse(text);
-      const arr  = Array.isArray(data) ? data : (data.slides || Object.values(data)[0] || []);
-      if (Array.isArray(arr) && arr.length >= 2) return { slides: arr, provider: "gemini" };
-    } catch (e) { console.error("Gemini carousel:", e.message); }
-  }
-
-  // Ollama
   try {
-    const { askOllama } = await import("@/lib/ollama-server");
-    const ollamaPrompt = `Return ONLY a JSON array with ${numSlides} slides for: "${title}"
-First slide title must be exactly: "${title}"
-Each caption must be specific to "${title}"
-Format: [{"title":"...","caption":"...","layout":"cover","template":"gradient-dark"},...]
-${content ? `Content: ${content.slice(0, 800)}` : ""}`;
-
-    const raw  = await askOllama(
-      [{ role: "user", content: ollamaPrompt }],
-      { temperature: 0.3, numPredict: 900, format: "json" }
-    );
-    const data = robustParse(raw);
+    const { text, provider } = await generateTextWithFallback({
+      system: "Generate useful, specific carousel slides. Return only a JSON array.",
+      user: prompt,
+      temperature: 0.4,
+      maxTokens: 1200,
+    });
+    const data = robustParse(text);
     const arr  = Array.isArray(data) ? data : (data.slides || Object.values(data)[0] || []);
-    if (Array.isArray(arr) && arr.length >= 2) return { slides: arr, provider: "ollama" };
-  } catch (e) { console.error("Ollama carousel:", e.message); }
+    if (Array.isArray(arr) && arr.length >= 2) return { slides: arr, provider };
+  } catch (e) { console.error("Carousel generation:", e.message); }
 
   return null;
 }

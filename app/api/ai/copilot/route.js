@@ -1,17 +1,16 @@
 // app/api/ai/copilot/route.js
 import { NextResponse } from "next/server";
 import { generateTextWithFallback } from "@/lib/ai-provider";
-import { fallbackCopilotReply } from "@/lib/ollama-server";
 
 export async function POST(request) {
-  let payload = {};
   try {
-    payload = await request.json();
-    const { message, context = "", history = [] } = payload;
+    const payload = await request.json();
+    const { message, context = "", history = [] } = payload || {};
 
-    if (!message?.trim()) {
+    if (typeof message !== "string" || !message.trim()) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
+    const safeHistory = Array.isArray(history) ? history : [];
 
     const { text: reply } = await generateTextWithFallback({
       system:
@@ -20,7 +19,7 @@ export async function POST(request) {
 ${context || "General creator workflow"}
 
 Recent chat history:
-${history
+${safeHistory
   .slice(-10)
   .map((item) => `${item.role}: ${item.content}`)
   .join("\n") || "No previous messages"}
@@ -34,10 +33,9 @@ ${message}`,
     return NextResponse.json({ success: true, reply });
   } catch (error) {
     console.error("Copilot error:", error.message);
-    return NextResponse.json({
-      success: true,
-      fallback: true,
-      reply: fallbackCopilotReply(payload.message),
-    });
+    return NextResponse.json(
+      { success: false, error: "The AI assistant could not respond. Check the AI provider configuration and try again." },
+      { status: error.status || 503 }
+    );
   }
 }

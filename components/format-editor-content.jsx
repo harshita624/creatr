@@ -12,7 +12,7 @@ import { BarLoader } from "react-spinners";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { generateBlogContent, improveContent } from "@/app/actions/ollama";
+import { generateBlogContent, improveContent } from "@/app/actions/ai-content";
 import { resolveVideoUrl } from "@/app/actions/media";
 import { uploadToImageKit } from "@/lib/imagekit";
 import PostEnhancer from "./post-enhancer";
@@ -160,7 +160,7 @@ export default function FormatEditorContent({ form, postId, onEnsureDraft, onIma
 
   const handleMediaUrlBlur = async (e) => {
     const raw = e.target.value.trim();
-    if (!raw || type === "livestream") return; // livestream URLs are stored as-is
+    if (!raw || type === "livestream" || type === "podcast") return; // keep live and audio URLs unchanged
 
     setResolvingUrl(true);
     try {
@@ -369,7 +369,7 @@ export default function FormatEditorContent({ form, postId, onEnsureDraft, onIma
                     value={values.mediaUrl || ""}
                     onChange={(e) => setNestedValue("mediaUrl", e.target.value)}
                     onBlur={handleMediaUrlBlur}
-                    placeholder={type === "livestream" ? "Paste live URL (optional)..." : "Paste media URL..."}
+                    placeholder={type === "livestream" ? "Paste live URL (optional)..." : type === "podcast" ? "Paste audio URL..." : "Paste media URL..."}
                     className="w-full bg-slate-50"
                   />
                   {resolvingUrl && (
@@ -382,7 +382,15 @@ export default function FormatEditorContent({ form, postId, onEnsureDraft, onIma
             {/* Format-specific studios */}
             {type === "livestream" && (
               <div className="w-full overflow-hidden">
-                <LivestreamStudio postId={postId} onEnsureDraft={onEnsureDraft} />
+                <LivestreamStudio
+                  postId={postId}
+                  onEnsureDraft={onEnsureDraft}
+                  onRecordingSaved={({ url, thumbnailUrl }) => {
+                    setValue("contentType", "video", { shouldDirty: true, shouldValidate: true });
+                    setValue("mediaUrl", url, { shouldDirty: true, shouldValidate: true });
+                    if (thumbnailUrl) setValue("featuredImage", thumbnailUrl, { shouldDirty: true, shouldValidate: true });
+                  }}
+                />
               </div>
             )}
             {(type === "video" || type === "reel") && (

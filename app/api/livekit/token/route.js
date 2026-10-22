@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { AccessToken } from "livekit-server-sdk";
 import { auth, currentUser } from "@clerk/nextjs/server";
 
 export async function POST(request) {
   const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -26,12 +24,17 @@ export async function POST(request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { roomName, isHost } = body;
-  if (!roomName) {
-    return NextResponse.json({ error: "roomName is required" }, { status: 400 });
+  const { roomName, isHost: requestedHost } = body;
+  const isHost = requestedHost === true;
+  if (typeof roomName !== "string" || !/^live-[a-zA-Z0-9]+$/.test(roomName)) {
+    return NextResponse.json({ error: "A valid live room name is required" }, { status: 400 });
+  }
+  if (isHost && !userId) {
+    return NextResponse.json({ error: "Sign in to start a livestream" }, { status: 401 });
   }
 
-  const user = await currentUser();
+  const user = userId ? await currentUser() : null;
+  const identity = userId || `viewer-${randomUUID()}`;
   const displayName = user?.fullName || user?.username || "Guest";
 
   // NOTE: anyone signed in who requests isHost: true gets a publish-capable
@@ -41,7 +44,7 @@ export async function POST(request) {
   // ownership. If you ever expose this route more broadly, also verify
   // postId -> authorId ownership here before granting canPublish.
   const token = new AccessToken(apiKey, apiSecret, {
-    identity: userId,
+    identity,
     name: displayName,
   });
 
@@ -49,7 +52,7 @@ export async function POST(request) {
     room: roomName,
     roomJoin: true,
     canPublish: Boolean(isHost),
-    canPublishData: true,
+    canPublishData: Boolean(isHost),
     canSubscribe: true,
   });
 

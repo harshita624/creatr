@@ -237,7 +237,7 @@ export default function TrendsPage() {
                           {topic.location    && <span>{topic.location}</span>}
                         </div>
                       </div>
-                      <Link href="/dashboard/create?type=article"
+                      <Link href={`/dashboard/create?type=article&topic=${encodeURIComponent(topic.topic || topic.title || topic)}`}
                         className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-500 hover:border-orange-300 hover:text-orange-600 transition-colors">
                         Write
                       </Link>

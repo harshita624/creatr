@@ -1,7 +1,7 @@
 // app/api/ai/semantic-search/route.js
 import { NextResponse } from "next/server";
 import { generateJsonWithFallback } from "@/lib/ai-provider";
-import { searchPostsLocally, stripHtml } from "@/lib/ollama-server";
+import { searchPostsLocally, stripHtml } from "@/lib/ai-utils";
 
 export async function POST(request) {
   let payload = {};

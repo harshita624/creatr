@@ -1,8 +1,6 @@
 "use server";
 
-import ollama from "ollama";
-
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:3b";
+import { generateTextWithFallback } from "@/lib/ai-provider";
 
 function stripHtml(content) {
   return (content || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -22,35 +20,16 @@ function formatContent(content) {
     .join("\n");
 }
 
-async function chatWithOllama(messages, options = {}) {
-  const response = await ollama.chat({
-    model: options.model || OLLAMA_MODEL,
-    messages,
-    options: {
-      temperature: options.temperature ?? 0.7,
-      num_predict: options.numPredict ?? 900,
-    },
-  });
-
-  return response?.message?.content || "";
-}
-
 export async function generateBlogContent(title, category = "", tags = []) {
   try {
     if (!title?.trim()) {
       throw new Error("Title required");
     }
 
-    const content = await chatWithOllama(
-      [
-        {
-          role: "system",
-          content:
-            "You are CreateK's local Ollama writing assistant. Write practical, engaging creator content. Return markdown only.",
-        },
-        {
-          role: "user",
-          content: `Write a concise blog post.
+    const { text: content } = await generateTextWithFallback({
+      system:
+        "You are CreateK's writing assistant. Write practical, engaging creator content. Return markdown only.",
+      user: `Write a concise blog post.
 Title: ${title}
 Category: ${category || "general"}
 Tags: ${(tags || []).join(", ") || "none"}
@@ -61,13 +40,12 @@ Requirements:
 - Use ## headings
 - Add a practical closing question
 - Do not include preface text`,
-        },
-      ],
-      { temperature: 0.72, numPredict: 900 }
-    );
+      temperature: 0.72,
+      maxTokens: 900,
+    });
 
     if (!content || content.length < 80) {
-      throw new Error("Ollama returned too little content");
+      throw new Error("AI returned too little content");
     }
 
     return {
@@ -75,11 +53,10 @@ Requirements:
       content: formatContent(content),
     };
   } catch (error) {
-    console.error("Ollama generation error:", error.message);
+    console.error("AI generation error:", error.message);
     return {
       success: false,
-      error:
-        "Ollama generation failed. Make sure Ollama is running and OLLAMA_MODEL is installed.",
+      error: error.message || "AI generation failed. Check the configured AI provider and try again.",
     };
   }
 }
@@ -101,34 +78,26 @@ export async function improveContent(content, mode = "enhance") {
         "Improve this post for clarity, hook strength, SEO, and audience engagement.",
     };
 
-    const improved = await chatWithOllama(
-      [
-        {
-          role: "system",
-          content:
-            "You are a local Ollama content editor. Preserve the author's intent. Return improved markdown only.",
-        },
-        {
-          role: "user",
-          content: `${prompts[mode] || prompts.enhance}
+    const { text: improved } = await generateTextWithFallback({
+      system:
+        "You are CreateK's content editor. Preserve the author's intent. Return improved markdown only.",
+      user: `${prompts[mode] || prompts.enhance}
 
 Post:
 ${text}`,
-        },
-      ],
-      { temperature: 0.55, numPredict: 900 }
-    );
+      temperature: 0.55,
+      maxTokens: 900,
+    });
 
     return {
       success: true,
       content: formatContent(improved),
     };
   } catch (error) {
-    console.error("Ollama improvement error:", error.message);
+    console.error("AI improvement error:", error.message);
     return {
       success: false,
-      error:
-        "Ollama improvement failed. Make sure Ollama is running and your model is available.",
+      error: error.message || "AI improvement failed. Check the configured AI provider and try again.",
     };
   }
 }

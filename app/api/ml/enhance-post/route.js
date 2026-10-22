@@ -22,7 +22,8 @@ export async function POST(request) {
     });
 
     if (!mlResponse.ok) {
-      throw new Error("ML backend request failed");
+      const detail = (await mlResponse.text()).slice(0, 300);
+      throw new Error(`ML backend returned HTTP ${mlResponse.status}${detail ? `: ${detail}` : ""}`);
     }
 
     const mlData = await mlResponse.json();
@@ -32,7 +33,7 @@ export async function POST(request) {
       ...buildAnalysis(mlData, text),
     });
   } catch (error) {
-    console.error("ML API Error:", error);
+    console.warn("ML backend unavailable; using fallback analysis:", error?.message || error);
 
     return NextResponse.json({
       success: true,

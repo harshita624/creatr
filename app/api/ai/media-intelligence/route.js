@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { stripHtml } from "@/lib/ollama-server";
+import { stripHtml } from "@/lib/ai-utils";
 import { generateJsonWithFallback } from "@/lib/ai-provider";
 
 const TYPE_LABELS = {

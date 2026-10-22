@@ -37,6 +37,7 @@ function CreateContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const type         = searchParams.get("type");
+  const initialTopic = searchParams.get("topic") || "";
 
   const { data: currentUser, isLoading: userLoading } = useConvexQuery(api.users.getCurrentUser);
   const { data: allDrafts,   isLoading: draftsLoading}= useConvexQuery(api.posts.getUserPosts, { status: "draft" });
@@ -82,7 +83,7 @@ function CreateContent() {
             </div>
           </div>
         )}
-        <PostEditor initialContentType={safeType} mode="create" />
+        <PostEditor initialContentType={safeType} initialTitle={initialTopic} mode="create" />
       </div>
     );
   }

@@ -155,3 +155,56 @@ export async function resolveVideoUrl(rawUrl) {
     return { success: false, error: "Couldn't reach that URL" };
   }
 }
+
+const DIRECT_AUDIO_EXTENSIONS = [".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus", ".flac"];
+
+function decodeXml(value) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([\da-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)));
+}
+
+export async function resolvePodcastUrl(rawUrl) {
+  const url = rawUrl?.trim();
+  if (!url) return { success: false, error: "No podcast URL provided" };
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Unsupported protocol");
+  } catch {
+    return { success: false, error: "Enter a valid podcast feed or audio URL" };
+  }
+
+  if (DIRECT_AUDIO_EXTENSIONS.some((ext) => parsed.pathname.toLowerCase().endsWith(ext))) {
+    return { success: true, url };
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; CreatorPodcastResolver/1.0)", Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) return { success: false, error: `Podcast feed returned HTTP ${response.status}` };
+
+    const xml = await response.text();
+    const items = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [xml];
+    for (const item of items) {
+      const enclosure = item.match(/<enclosure\b[^>]*\burl=["']([^"']+)["'][^>]*>/i);
+      const media = item.match(/<media:content\b[^>]*\burl=["']([^"']+)["'][^>]*\btype=["']audio\//i);
+      const audioUrl = enclosure?.[1] || media?.[1];
+      if (audioUrl) {
+        const image = item.match(/<itunes:image\b[^>]*\bhref=["']([^"']+)["']/i) || xml.match(/<itunes:image\b[^>]*\bhref=["']([^"']+)["']/i);
+        return { success: true, url: new URL(decodeXml(audioUrl), url).toString(), thumbnailUrl: image?.[1] ? decodeXml(image[1]) : null };
+      }
+    }
+    return { success: false, error: "No playable episode was found in this podcast feed" };
+  } catch (error) {
+    return { success: false, error: error.name === "TimeoutError" ? "Podcast feed took too long to respond" : "Could not load this podcast feed" };
+  }
+}

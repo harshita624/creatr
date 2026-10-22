@@ -12,6 +12,7 @@ import {
   Send, Smile,
 } from "lucide-react";
 import { toast } from "sonner";
+import PodcastAudioPlayer from "@/components/podcast-audio-player";
 
 /*
   TWO-STAGE MODERATION
@@ -136,10 +137,11 @@ export default function FeedPostCard({ post }) {
   useEffect(() => { if (bookmarkStatus !== undefined) setSaved(bookmarkStatus); }, [bookmarkStatus]);
 
   const isCarousel     = post.contentType === "carousel";
+  const isPodcast      = post.contentType === "podcast";
   const carouselSlides = post.carouselSlides ?? [];
   const isVideo        = post.mediaUrl && (post.contentType === "reel" || post.contentType === "video");
-  const imgSrc         = post.featuredImage || (!isVideo ? post.mediaUrl : null);
-  const hasMedia       = isVideo || !!imgSrc || isCarousel;
+  const imgSrc         = post.featuredImage || (!isVideo && !isPodcast ? post.mediaUrl : null);
+  const hasMedia       = isVideo || !!imgSrc || isCarousel || (isPodcast && !!post.mediaUrl);
 
   const handleDoubleTap = useCallback(async () => {
     const now = Date.now();
@@ -295,6 +297,12 @@ export default function FeedPostCard({ post }) {
         <div className="relative select-none px-8 py-14" style={{ background: "linear-gradient(135deg,#fff7ed,#fdf2f8,#f5f3ff)", minHeight: 180 }} onClick={handleDoubleTap}>
           <p className="text-center text-lg font-semibold leading-7 text-[#262626]">{caption}</p>
           {showBurst && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><span className="heart-burst text-[80px]">❤️</span></div>}
+        </div>
+      )}
+
+      {isPodcast && post.mediaUrl && (
+        <div className="px-3 pb-3">
+          <PodcastAudioPlayer src={post.mediaUrl} />
         </div>
       )}
 

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Hash, ImageIcon, Sparkles, Wand2, Plus, Minus, Zap, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
-import { generateBlogContent, improveContent } from "@/app/actions/ollama";
+import { generateBlogContent, improveContent } from "@/app/actions/ai-content";
 import { BarLoader } from "react-spinners";
 import PostEnhancer from "./post-enhancer";
 import AudienceSimulator from "./audience-simulator";
