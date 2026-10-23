@@ -133,8 +133,8 @@ const PostEditor = ({ initialData = null, initialContentType = "article", initia
       }
 
       const postData = {
-        title: data.title.trim(),
-        content: data.content.trim(),
+        title: (data.title || "").trim(),
+        content: (data.content || "").trim(),
         category: data.category || undefined,
         tags: data.tags || [],
         featuredImage: data.featuredImage || undefined,
@@ -188,11 +188,19 @@ const PostEditor = ({ initialData = null, initialContentType = "article", initia
     }
   };
 
-  const handleSave = (silent = false) =>
-    handleSubmit((data) => submitPost(data, "draft", silent))();
+  const saveDraft = async (silent = false) => {
+    try {
+      // Drafts may be incomplete; only publishing should enforce the full form schema.
+      return await submitPost(getValues(), "draft", silent);
+    } catch {
+      // submitPost already logs the failure and shows a toast for manual saves.
+      return undefined;
+    }
+  };
 
-  const ensureDraft = () =>
-    handleSubmit((data) => submitPost(data, "draft", true))();
+  const handleSave = (silent = false) => saveDraft(silent);
+
+  const ensureDraft = () => saveDraft(true);
 
   const handleSettingsSave = () => {
     const { title, content } = getValues();
