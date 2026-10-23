@@ -94,7 +94,7 @@ Frontend `.env.local`:
 NEXT_PUBLIC_CONVEX_URL=your-convex-deployment-url
 LIVEKIT_API_KEY=your-livekit-api-key
 LIVEKIT_API_SECRET=your-livekit-api-secret
-NEXT_PUBLIC_LIVEKIT_URL=wss://your-livekit-instance
+LIVEKIT_URL=wss://your-livekit-instance
 INNGEST_EVENT_KEY=your-inngest-event-key
 JWT_SECRET=long-random-secret
 ```

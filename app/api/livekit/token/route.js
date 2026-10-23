@@ -8,11 +8,11 @@ export async function POST(request) {
 
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
-  const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+  const wsUrl = process.env.LIVEKIT_URL;
 
   if (!apiKey || !apiSecret || !wsUrl) {
     return NextResponse.json(
-      { error: "LiveKit is not configured. Add LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and NEXT_PUBLIC_LIVEKIT_URL." },
+      { error: "LiveKit is not configured. Add LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVEKIT_URL." },
       { status: 503 }
     );
   }
