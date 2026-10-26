@@ -20,6 +20,7 @@ const FORMAT_TYPES = [
   { type: "video",      icon: Video,       label: "Video",          desc: "Long-form video with chapters, subtitles, and AI summaries.",          grad: "from-blue-100 to-sky-200",       accent: "text-blue-600",    border: "hover:border-blue-300"    },
   { type: "livestream", icon: Radio,       label: "Livestream",     desc: "Go live directly from your browser — no software needed.",             grad: "from-red-100 to-rose-200",       accent: "text-red-600",     border: "hover:border-red-300"     },
   { type: "podcast",    icon: Mic2,        label: "Podcast",        desc: "Audio episodes with show notes, chapters, and guest details.",         grad: "from-amber-100 to-yellow-200",   accent: "text-amber-600",   border: "hover:border-amber-300"   },
+  { type: "photo",      icon: ImageIcon,   label: "Photo post",   desc: "Share one photo or a multi-photo post with editable filters.", grad: "from-pink-100 to-rose-200", accent: "text-pink-600", border: "hover:border-pink-300" },
   { type: "carousel",   icon: ImageIcon,   label: "Carousel",       desc: "Multi-slide visual content. Generate slides from a title with AI.",   grad: "from-emerald-100 to-green-200",  accent: "text-emerald-600", border: "hover:border-emerald-300" },
 ];
 

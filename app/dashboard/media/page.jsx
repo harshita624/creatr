@@ -17,6 +17,7 @@ const MEDIA_TYPES = [
   { id: "video",      label: "Videos"      },
   { id: "podcast",    label: "Podcasts"    },
   { id: "carousel",   label: "Carousels"   },
+  { id: "photo",      label: "Photo posts" },
   { id: "livestream", label: "Livestreams" },
 ];
 
@@ -25,6 +26,7 @@ const TYPE_META = {
   video:      { icon: Video,        color: "text-blue-600",     bg: "bg-blue-50",     label: "Video"      },
   podcast:    { icon: Mic2,         color: "text-amber-600",    bg: "bg-amber-50",    label: "Podcast"    },
   carousel:   { icon: ImageIcon,    color: "text-emerald-600",  bg: "bg-emerald-50",  label: "Carousel"   },
+  photo:      { icon: ImageIcon,    color: "text-pink-600",     bg: "bg-pink-50",     label: "Photo post" },
   livestream: { icon: Radio,        color: "text-red-600",      bg: "bg-red-50",      label: "Livestream" },
 };
 
@@ -71,7 +73,7 @@ export default function MediaStudioPage() {
 
         {/* Stats */}
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {["reel", "video", "podcast", "carousel"].map((t) => {
+          {["reel", "video", "podcast", "carousel", "photo"].map((t) => {
             const meta  = TYPE_META[t];
             const Icon  = meta.icon;
             const count = (allPosts || []).filter((p) => p.contentType === t).length;

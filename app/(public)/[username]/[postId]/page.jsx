@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { SignInButton } from "@clerk/nextjs";
 import LivestreamViewer from "@/components/livestream-viewer";
 import PodcastAudioPlayer from "@/components/podcast-audio-player";
+import { getPhotoFilterCss } from "@/lib/photo-filters";
 
 /* ── Slide styles (matches the editor) ────────────────────────────── */
 const SLIDE_STYLES = {
@@ -214,6 +215,8 @@ export default function PublicPostPage() {
 
   const author        = post.author;
   const isCarousel    = post.contentType === "carousel";
+  const isPhoto       = post.contentType === "photo";
+  const photos        = post.photoItems ?? [];
   const slides        = post.carouselSlides ?? [];
   const totalSlides   = slides.length;
   const isVideo       = post.contentType === "reel" || post.contentType === "video";
@@ -247,6 +250,18 @@ export default function PublicPostPage() {
             >
               {isLivestream ? (
                 <LivestreamViewer postId={post._id} />
+              ) : isPhoto && photos.length > 0 ? (
+                <>
+                  <img src={photos[carouselIdx]?.url} alt={`${caption} photo ${carouselIdx + 1}`} className="absolute inset-0 h-full w-full object-contain" style={{ filter: getPhotoFilterCss(photos[carouselIdx]?.filter) }} />
+                  {photos.length > 1 && (
+                    <>
+                      {carouselIdx > 0 && <button onClick={() => setCarouselIdx((i) => i - 1)} className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white"><ChevronLeft className="h-5 w-5" /></button>}
+                      {carouselIdx < photos.length - 1 && <button onClick={() => setCarouselIdx((i) => i + 1)} className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white"><ChevronRight className="h-5 w-5" /></button>}
+                      <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">{photos.map((_, i) => <button key={i} type="button" onClick={() => setCarouselIdx(i)} aria-label={`Show photo ${i + 1}`} className={`h-2 rounded-full transition-all ${i === carouselIdx ? "w-4 bg-white" : "w-2 bg-white/50"}`} />)}</div>
+                      <div className="absolute right-3 top-3 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-bold text-white">{carouselIdx + 1} / {photos.length}</div>
+                    </>
+                  )}
+                </>
               ) : isCarousel && totalSlides > 0 ? (
                 <>
                   <SlideCard

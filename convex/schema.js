@@ -38,10 +38,12 @@ export default defineSchema({
         v.literal("video"),
         v.literal("livestream"),
         v.literal("podcast"),
-        v.literal("carousel")
+        v.literal("carousel"),
+        v.literal("photo")
       )
     ),
     mediaUrl: v.optional(v.string()),
+    photoItems: v.optional(v.array(v.object({ url: v.string(), filter: v.optional(v.string()) }))),
     monetization: v.optional(
       v.union(v.literal("free"), v.literal("members"), v.literal("paid"))
     ),
@@ -65,6 +67,8 @@ export default defineSchema({
         sensitive: v.optional(v.string()),
         allowRemix: v.optional(v.string()),
         showLikes: v.optional(v.string()),
+        embedType: v.optional(v.string()),
+        embedThumbnailUrl: v.optional(v.string()),
       })
     ),
     createdAt: v.number(),
@@ -233,7 +237,8 @@ export default defineSchema({
     contentType: v.optional(
       v.union(
         v.literal("article"), v.literal("reel"), v.literal("video"),
-        v.literal("livestream"), v.literal("podcast"), v.literal("carousel")
+        v.literal("livestream"), v.literal("podcast"), v.literal("carousel"),
+        v.literal("photo")
       )
     ),
     tags: v.optional(v.array(v.string())),

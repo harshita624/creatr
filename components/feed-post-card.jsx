@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import PodcastAudioPlayer from "@/components/podcast-audio-player";
+import { getPhotoFilterCss } from "@/lib/photo-filters";
 
 /*
   TWO-STAGE MODERATION
@@ -137,11 +138,14 @@ export default function FeedPostCard({ post }) {
   useEffect(() => { if (bookmarkStatus !== undefined) setSaved(bookmarkStatus); }, [bookmarkStatus]);
 
   const isCarousel     = post.contentType === "carousel";
+  const isPhoto        = post.contentType === "photo";
+  const photoItems     = post.photoItems ?? [];
+  const activePhoto    = photoItems[carouselIdx];
   const isPodcast      = post.contentType === "podcast";
   const carouselSlides = post.carouselSlides ?? [];
   const isVideo        = post.mediaUrl && (post.contentType === "reel" || post.contentType === "video");
   const imgSrc         = post.featuredImage || (!isVideo && !isPodcast ? post.mediaUrl : null);
-  const hasMedia       = isVideo || !!imgSrc || isCarousel || (isPodcast && !!post.mediaUrl);
+  const hasMedia       = isVideo || !!imgSrc || isCarousel || !!activePhoto || (isPodcast && !!post.mediaUrl);
 
   const handleDoubleTap = useCallback(async () => {
     const now = Date.now();
@@ -251,7 +255,20 @@ export default function FeedPostCard({ post }) {
       </div>
 
       {/* Media */}
-      {isCarousel && carouselSlides.length > 0 ? (
+      {isPhoto && activePhoto ? (
+        <div className="relative select-none bg-black" style={{ aspectRatio: "1/1" }} onClick={handleDoubleTap}>
+          <img src={activePhoto.url} alt={caption || `Photo ${carouselIdx + 1}`} className="absolute inset-0 h-full w-full object-cover" style={{ filter: getPhotoFilterCss(activePhoto.filter) }} />
+          {photoItems.length > 1 && (
+            <>
+              {carouselIdx > 0 && <button onClick={(e) => { e.stopPropagation(); setCarouselIdx((i) => i - 1); }} className="absolute left-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white"><ChevronLeft className="h-5 w-5" /></button>}
+              {carouselIdx < photoItems.length - 1 && <button onClick={(e) => { e.stopPropagation(); setCarouselIdx((i) => i + 1); }} className="absolute right-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white"><ChevronRight className="h-5 w-5" /></button>}
+              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1">{photoItems.map((_, i) => <span key={i} className={`h-1.5 rounded-full ${i === carouselIdx ? "w-3 bg-white" : "w-1.5 bg-white/50"}`} />)}</div>
+              <div className="absolute right-3 top-3 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-bold text-white">{carouselIdx + 1} / {photoItems.length}</div>
+            </>
+          )}
+          {showBurst && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><span className="heart-burst text-[90px]">❤️</span></div>}
+        </div>
+      ) : isCarousel && carouselSlides.length > 0 ? (
         <div style={{ position: "relative", aspectRatio: "1/1", background: "#000" }} onClick={handleDoubleTap}>
           <div style={{ position: "absolute", inset: 0 }}>
             <FeedSlidePreview slide={carouselSlides[carouselIdx]} index={carouselIdx} total={carouselSlides.length} />

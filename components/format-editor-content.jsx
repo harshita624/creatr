@@ -19,6 +19,7 @@ import PostEnhancer from "./post-enhancer";
 import AudienceSimulator from "./audience-simulator";
 import MediaIntelligencePanel from "./media-intelligence-panel";
 import CarouselBuilder from "./carousel-builder";
+import PhotoPostBuilder from "./photo-post-builder";
 import VideoReelStudio from "./video-reel-studio";
 import PodcastStudio from "./podcast-studio";
 import LivestreamStudio from "./livestream-studio";
@@ -72,6 +73,15 @@ const FORMAT_CONFIG = {
     tools:     ["Guest management","Series","Premium episodes","Episode number"],
     analytics: ["Listens","Completion rate","Subscriber growth"],
   },
+  photo: {
+    label: "Photo post", icon: ImageIcon,
+    titleLabel: "Caption", titlePlaceholder: "Write a caption...",
+    contentLabel: "Post text", contentPlaceholder: "Add context or a longer description (optional)...",
+    mediaTitle: "Photos", mediaAccept: "image/*", mediaButton: "Add photos", mediaField: "photoItems",
+    ai: ["Photo filters", "Multi-photo posts", "Caption writing"],
+    tools: ["Up to 10 photos", "Reorder photos", "Per-photo filters"],
+    analytics: ["Likes", "Comments", "Saves", "Shares"],
+  },
   carousel: {
     label: "Carousel", icon: ImageIcon,
     titleLabel: "Title", titlePlaceholder: "Name the carousel...",
@@ -108,6 +118,9 @@ const META_FIELDS = {
     ["postMeta.episodeNumber","Episode number",Mic2,"Episode 12"],
     ["postMeta.showNotes","Guest / series",Users,"Guest, series, sponsor"],
     ["postMeta.seoKeywords","SEO keywords",Search,"podcast keywords"],
+  ],
+  photo: [
+    ["postMeta.location","Location",Share2,"City or event"],
   ],
   carousel: [
     ["postMeta.ctaSlide","CTA slide",Lightbulb,"Save, share, subscribe"],
@@ -321,7 +334,10 @@ export default function FormatEditorContent({ form, postId, onEnsureDraft, onIma
               </div>
             )}
 
+            {type === "photo" && <PhotoPostBuilder form={form} />}
+
             {/* Media upload */}
+            {type !== "photo" && (
             <section className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -378,6 +394,8 @@ export default function FormatEditorContent({ form, postId, onEnsureDraft, onIma
                 </>
               )}
             </section>
+
+            )}
 
             {/* Format-specific studios */}
             {type === "livestream" && (

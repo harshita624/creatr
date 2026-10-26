@@ -14,13 +14,14 @@ import { toast } from "sonner";
 import ImageUploadModal from "./image-upload-modal";
 
 const postSchema = z.object({
-  title: z.string().min(1, "Title is required").max(200),
-  content: z.string().min(1, "Content is required"),
+  title: z.string().max(200),
+  content: z.string(),
   category: z.string().optional(),
   tags: z.array(z.string()).max(10),
   featuredImage: z.string().optional(),
-  contentType: z.enum(["article", "reel", "video", "livestream", "podcast", "carousel"]).optional(),
+  contentType: z.enum(["article", "reel", "video", "livestream", "podcast", "carousel", "photo"]).optional(),
   mediaUrl: z.string().optional(),
+  photoItems: z.array(z.object({ url: z.string(), filter: z.string().optional() })).optional(),
   monetization: z.enum(["free", "members", "paid"]).optional(),
   priceCents: z.number().min(0).optional(),
   allowComments: z.boolean().optional(),
@@ -37,6 +38,8 @@ const postSchema = z.object({
     ctaSlide: z.string().optional(),
     collaborators: z.string().optional(),
     readinessNotes: z.string().optional(),
+    embedType: z.string().optional(),
+    embedThumbnailUrl: z.string().optional(),
   }).optional(),
   scheduledFor: z.string().optional(),
 });
@@ -74,6 +77,7 @@ const PostEditor = ({ initialData = null, initialContentType = "article", initia
       featuredImage: initialData?.featuredImage || "",
       contentType: initialData?.contentType || initialContentType,
       mediaUrl: initialData?.mediaUrl || "",
+      photoItems: initialData?.photoItems || [],
       monetization: initialData?.monetization || "free",
       priceCents: initialData?.priceCents ?? undefined,
       allowComments: initialData?.allowComments ?? true,
@@ -102,12 +106,17 @@ const PostEditor = ({ initialData = null, initialContentType = "article", initia
   const submitPost = async (data, action, silent = false) => {
     try {
       if (action === "publish") {
-        if (!data.title || data.title.trim().length < 10) {
+        const contentType = data.contentType || "article";
+        if (contentType !== "photo" && (!data.title || data.title.trim().length < 10)) {
           toast.error("Title must be at least 10 characters");
           return;
         }
-        const contentType = data.contentType || "article";
         const plainContent = stripHtml(data.content);
+
+        if (contentType === "photo" && !(data.photoItems || []).length) {
+          toast.error("Add at least one photo before publishing");
+          return;
+        }
 
         if (contentType === "article" && plainContent.length < 100) {
           toast.error("Post content must be at least 100 characters");
@@ -133,13 +142,14 @@ const PostEditor = ({ initialData = null, initialContentType = "article", initia
       }
 
       const postData = {
-        title: (data.title || "").trim(),
-        content: (data.content || "").trim(),
+        title: (data.title || "").trim() || (data.contentType === "photo" ? "Photo post" : ""),
+        content: (data.content || "").trim() || (data.contentType === "photo" ? (data.title || "").trim() : ""),
         category: data.category || undefined,
         tags: data.tags || [],
         featuredImage: data.featuredImage || undefined,
         contentType: data.contentType || "article",
         mediaUrl: data.mediaUrl || undefined,
+        photoItems: data.photoItems || [],
         monetization: data.monetization || "free",
         priceCents: data.monetization === "paid" ? Math.round(data.priceCents || 0) : undefined,
         allowComments: data.allowComments ?? true,

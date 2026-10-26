@@ -15,9 +15,11 @@ export const create = mutation({
       v.literal("video"),
       v.literal("livestream"),
       v.literal("podcast"),
-      v.literal("carousel")
+      v.literal("carousel"),
+      v.literal("photo")
     )),
     mediaUrl: v.optional(v.string()),
+    photoItems: v.optional(v.array(v.object({ url: v.string(), filter: v.optional(v.string()) }))),
     monetization: v.optional(v.union(
       v.literal("free"),
       v.literal("members"),
@@ -38,6 +40,8 @@ export const create = mutation({
       ctaSlide: v.optional(v.string()),
       collaborators: v.optional(v.string()),
       readinessNotes: v.optional(v.string()),
+      embedType: v.optional(v.string()),
+      embedThumbnailUrl: v.optional(v.string()),
     })),
     scheduledFor: v.optional(v.number()),
   },
@@ -55,6 +59,8 @@ export const create = mutation({
     if (!user) {
       throw new Error("User not found");
     }
+
+    if (args.photoItems && args.photoItems.length > 10) throw new Error("A photo post can contain up to 10 photos");
 
     const draftContentType = args.contentType || "article";
     const existingDrafts = await ctx.db
@@ -79,6 +85,7 @@ export const create = mutation({
         featuredImage: args.featuredImage || undefined,
         contentType: draftContentType,
         mediaUrl: args.mediaUrl || undefined,
+        photoItems: args.photoItems || undefined,
         monetization: args.monetization || "free",
         priceCents: args.monetization === "paid" ? args.priceCents : undefined,
         allowComments: args.allowComments ?? true,
@@ -99,6 +106,7 @@ export const create = mutation({
         featuredImage: args.featuredImage || undefined,
         contentType: draftContentType,
         mediaUrl: args.mediaUrl || undefined,
+        photoItems: args.photoItems || undefined,
         monetization: args.monetization || "free",
         priceCents: args.monetization === "paid" ? args.priceCents : undefined,
         allowComments: args.allowComments ?? true,
@@ -119,6 +127,7 @@ export const create = mutation({
       featuredImage: args.featuredImage,
       contentType: draftContentType,
       mediaUrl: args.mediaUrl,
+      photoItems: args.photoItems,
       monetization: args.monetization || "free",
       priceCents: args.monetization === "paid" ? args.priceCents : undefined,
       allowComments: args.allowComments ?? true,
@@ -151,9 +160,11 @@ export const update = mutation({
       v.literal("video"),
       v.literal("livestream"),
       v.literal("podcast"),
-      v.literal("carousel")
+      v.literal("carousel"),
+      v.literal("photo")
     )),
     mediaUrl: v.optional(v.string()),
+    photoItems: v.optional(v.array(v.object({ url: v.string(), filter: v.optional(v.string()) }))),
     monetization: v.optional(v.union(
       v.literal("free"),
       v.literal("members"),
@@ -174,6 +185,8 @@ export const update = mutation({
       ctaSlide: v.optional(v.string()),
       collaborators: v.optional(v.string()),
       readinessNotes: v.optional(v.string()),
+      embedType: v.optional(v.string()),
+      embedThumbnailUrl: v.optional(v.string()),
     })),
     scheduledFor: v.optional(v.number()),
   },
@@ -191,6 +204,8 @@ export const update = mutation({
     if (!user) {
       throw new Error("User not found");
     }
+
+    if (args.photoItems && args.photoItems.length > 10) throw new Error("A photo post can contain up to 10 photos");
 
     const post = await ctx.db.get(args.id);
     if (!post) {
@@ -213,6 +228,7 @@ export const update = mutation({
     if (args.featuredImage !== undefined) updateData.featuredImage = args.featuredImage;
     if (args.contentType !== undefined) updateData.contentType = args.contentType;
     if (args.mediaUrl !== undefined) updateData.mediaUrl = args.mediaUrl;
+    if (args.photoItems !== undefined) updateData.photoItems = args.photoItems;
     if (args.monetization !== undefined) updateData.monetization = args.monetization;
     if (args.priceCents !== undefined) updateData.priceCents = args.priceCents;
     if (args.allowComments !== undefined) updateData.allowComments = args.allowComments;

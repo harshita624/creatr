@@ -23,7 +23,8 @@ const contentTypeValidator = v.union(
   v.literal("video"),
   v.literal("livestream"),
   v.literal("podcast"),
-  v.literal("carousel")
+  v.literal("carousel"),
+  v.literal("photo")
 );
 
 async function getCurrentUser(ctx) {

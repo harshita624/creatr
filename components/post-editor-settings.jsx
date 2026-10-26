@@ -34,6 +34,7 @@ const CONTENT_TYPES = [
   { value: "livestream", label: "Livestream" },
   { value: "podcast",    label: "Podcast"    },
   { value: "carousel",   label: "Carousel"   },
+  { value: "photo",      label: "Photo post" },
 ];
 
 const MEDIA_SETTINGS = {

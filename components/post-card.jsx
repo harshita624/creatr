@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getPhotoFilterCss } from "@/lib/photo-filters";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -87,7 +88,8 @@ const PostCard = ({
   const isVideoLike = ["reel", "video", "livestream"].includes(contentType);
   const embedUrl = post.mediaUrl ? getEmbeddableMediaUrl(post.mediaUrl) : null;
   const isAudio = contentType === "podcast";
-  const displayImage = post.featuredImage || (isLikelyImageUrl(post.mediaUrl) ? post.mediaUrl : null);
+  const displayImage = post.photoItems?.[0]?.url || post.featuredImage || (isLikelyImageUrl(post.mediaUrl) ? post.mediaUrl : null);
+  const displayImageFilter = post.photoItems?.[0]?.filter;
   const typeLabels = {
     article: "Article",
     reel: "Reel",
@@ -95,6 +97,7 @@ const PostCard = ({
     livestream: "Live",
     podcast: "Audio",
     carousel: "Carousel",
+    photo: "Photo",
   };
 
   return (
@@ -145,6 +148,7 @@ const PostCard = ({
                 alt={post.title}
                 fill
                 className="object-cover transition-transform duration-500 group-hover:scale-110"
+                style={contentType === "photo" ? { filter: getPhotoFilterCss(displayImageFilter) } : undefined}
               />
               {/* Gradient Overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
