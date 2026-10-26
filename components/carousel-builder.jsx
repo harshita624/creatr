@@ -6,7 +6,7 @@ import {
   AlignCenter, AlignLeft, AlignRight, Check, Copy, Eye, EyeOff,
   LayoutTemplate, Loader2, Plus, Trash2, Upload,
   Layers, ChevronLeft, ChevronRight, Wand2, X,
-  Palette, Type, Sparkles, Maximize2,
+  Palette, Type, Sparkles, Maximize2, RotateCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
@@ -66,6 +66,40 @@ function resolveFonts(slide) {
   return FONT_SIZES.find((f) => f.id === (slide.fontSize || "lg")) || FONT_SIZES[2];
 }
 
+function imageTransformAtPointer(interaction, event) {
+  const dx = ((event.clientX - interaction.startX) / interaction.rect.width) * 100;
+  const dy = ((event.clientY - interaction.startY) / interaction.rect.height) * 100;
+  const { base, mode, corner } = interaction;
+
+  if (mode === "rotate") {
+    const angle = Math.atan2(event.clientY - interaction.centerY, event.clientX - interaction.centerX) * (180 / Math.PI);
+    let delta = angle - interaction.startAngle;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    return { ...base, rotation: base.rotation + delta };
+  }
+
+  if (mode === "move") {
+    return {
+      ...base,
+      x: Math.max(-base.width + 8, Math.min(92, base.x + dx)),
+      y: Math.max(-base.height + 8, Math.min(92, base.y + dy)),
+    };
+  }
+
+  const minSize = 12;
+  const maxSize = 300;
+  let left = base.x;
+  let top = base.y;
+  let right = base.x + base.width;
+  let bottom = base.y + base.height;
+  if (corner.includes("w")) left = Math.max(right - maxSize, Math.min(right - minSize, left + dx));
+  if (corner.includes("e")) right = Math.max(left + minSize, Math.min(left + maxSize, right + dx));
+  if (corner.includes("n")) top = Math.max(bottom - maxSize, Math.min(bottom - minSize, top + dy));
+  if (corner.includes("s")) bottom = Math.max(top + minSize, Math.min(top + maxSize, bottom + dy));
+  return { ...base, x: left, y: top, width: right - left, height: bottom - top };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SlideCanvas — the visual card (edit + preview)
 // Sizing is done with pure CSS clamp() (viewport-relative), NOT a JS
@@ -86,19 +120,25 @@ export function SlideCanvas({ slide, index, editing = false, onUpdate, compact =
         height: slide.imageHeight ?? 100,
       };
 
-  const startImageInteraction = (event, mode) => {
+  const startImageInteraction = (event, mode, corner = null) => {
     if (!editing) return;
     event.preventDefault();
     event.stopPropagation();
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    const frame = event.currentTarget.closest("[data-image-frame]");
+    const frameRect = frame?.getBoundingClientRect();
+    if (!canvasRect || !frameRect) return;
     imageInteractionRef.current = {
       pointerId: event.pointerId,
       mode,
+      corner,
       startX: event.clientX,
       startY: event.clientY,
-      rect,
-      base: imageTransform,
+      rect: canvasRect,
+      centerX: frameRect.left + frameRect.width / 2,
+      centerY: frameRect.top + frameRect.height / 2,
+      startAngle: Math.atan2(event.clientY - (frameRect.top + frameRect.height / 2), event.clientX - (frameRect.left + frameRect.width / 2)) * (180 / Math.PI),
+      base: { ...imageTransform, rotation: slide.imageRotation ?? 0 },
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -106,40 +146,14 @@ export function SlideCanvas({ slide, index, editing = false, onUpdate, compact =
   const moveImageInteraction = (event) => {
     const interaction = imageInteractionRef.current;
     if (!interaction || interaction.pointerId !== event.pointerId) return;
-    const dx = ((event.clientX - interaction.startX) / interaction.rect.width) * 100;
-    const dy = ((event.clientY - interaction.startY) / interaction.rect.height) * 100;
-    const { base, mode } = interaction;
-    const next = mode === "resize"
-      ? {
-          ...base,
-          width: Math.max(12, Math.min(100 - base.x, base.width + dx)),
-          height: Math.max(12, Math.min(100 - base.y, base.height + dy)),
-        }
-      : {
-          ...base,
-          x: Math.max(0, Math.min(100 - base.width, base.x + dx)),
-          y: Math.max(0, Math.min(100 - base.height, base.y + dy)),
-        };
+    const next = imageTransformAtPointer(interaction, event);
     setDraftImageTransform({ slideId: slide._id, imageUrl: slide.imageUrl, transform: next });
   };
 
   const finishImageInteraction = (event) => {
     const interaction = imageInteractionRef.current;
     if (!interaction || interaction.pointerId !== event.pointerId) return;
-    const dx = ((event.clientX - interaction.startX) / interaction.rect.width) * 100;
-    const dy = ((event.clientY - interaction.startY) / interaction.rect.height) * 100;
-    const { base, mode } = interaction;
-    const next = mode === "resize"
-      ? {
-          ...base,
-          width: Math.max(12, Math.min(100 - base.x, base.width + dx)),
-          height: Math.max(12, Math.min(100 - base.y, base.height + dy)),
-        }
-      : {
-          ...base,
-          x: Math.max(0, Math.min(100 - base.width, base.x + dx)),
-          y: Math.max(0, Math.min(100 - base.height, base.y + dy)),
-        };
+    const next = imageTransformAtPointer(interaction, event);
     setDraftImageTransform({ slideId: slide._id, imageUrl: slide.imageUrl, transform: next });
     imageInteractionRef.current = null;
     onUpdate?.({
@@ -147,6 +161,7 @@ export function SlideCanvas({ slide, index, editing = false, onUpdate, compact =
       imagePositionY: Number(next.y.toFixed(2)),
       imageWidth: Number(next.width.toFixed(2)),
       imageHeight: Number(next.height.toFixed(2)),
+      imageRotation: Number((((next.rotation % 360) + 360) % 360).toFixed(2)),
     });
   };
 
@@ -183,10 +198,12 @@ export function SlideCanvas({ slide, index, editing = false, onUpdate, compact =
     >
       {slide.imageUrl && (
         <div
+          data-image-frame
           className={`absolute touch-none ${editing ? "z-10 cursor-move" : "pointer-events-none"}`}
           style={{
             left: `${imageTransform.x}%`, top: `${imageTransform.y}%`,
             width: `${imageTransform.width}%`, height: `${imageTransform.height}%`,
+            transform: `rotate(${imageTransform.rotation ?? 0}deg)`, transformOrigin: "center",
             opacity: slide.imageOpacity ?? 0.18,
             border: editing ? "1px dashed rgba(249,115,22,.9)" : "none",
           }}
@@ -194,17 +211,30 @@ export function SlideCanvas({ slide, index, editing = false, onUpdate, compact =
           onPointerMove={moveImageInteraction}
           onPointerUp={finishImageInteraction}
           onPointerCancel={finishImageInteraction}
-          title={editing ? "Drag to move; drag the corner to resize" : undefined}
+          title={editing ? "Drag to move; use corner handles to resize; drag the rotate handle to rotate" : undefined}
         >
           <img src={slide.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover pointer-events-none"
             style={{ filter: getPhotoFilterCss(slide.imageFilter) }} />
           {editing && (
-            <button type="button" aria-label="Resize image" title="Drag to resize"
-              className="absolute bottom-1 right-1 z-30 flex h-6 w-6 items-center justify-center rounded-md border-2 border-orange-500 bg-white shadow cursor-nwse-resize touch-none"
-              onPointerDown={(event) => startImageInteraction(event, "resize")}
-              onClick={(event) => event.stopPropagation()}>
-              <Maximize2 className="h-3 w-3 text-orange-600" />
-            </button>
+            <>
+              {[
+                ["nw", "top-1 left-1", "cursor-nwse-resize"],
+                ["ne", "top-1 right-1", "cursor-nesw-resize"],
+                ["sw", "bottom-1 left-1", "cursor-nesw-resize"],
+                ["se", "bottom-1 right-1", "cursor-nwse-resize"],
+              ].map(([corner, position, cursor]) => (
+                <button key={corner} type="button" aria-label={`Resize image ${corner}`} title="Drag to resize"
+                  className={`absolute ${position} z-30 h-4 w-4 rounded-full border-2 border-orange-500 bg-white shadow ${cursor} touch-none`}
+                  onPointerDown={(event) => startImageInteraction(event, "resize", corner)}
+                  onClick={(event) => event.stopPropagation()} />
+              ))}
+              <button type="button" aria-label="Rotate image" title="Drag to rotate"
+                className="absolute left-1/2 top-1 z-30 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-orange-500 bg-white shadow cursor-grab touch-none"
+                onPointerDown={(event) => startImageInteraction(event, "rotate")}
+                onClick={(event) => event.stopPropagation()}>
+                <RotateCw className="h-3 w-3 text-orange-600" />
+              </button>
+            </>
           )}
         </div>
       )}
@@ -228,7 +258,7 @@ export function SlideCanvas({ slide, index, editing = false, onUpdate, compact =
         </div>
       )}
 
-      <div className={`absolute inset-0 z-10 flex flex-col ${px} ${isCover ? "justify-center" : "justify-end"}`}
+      <div className={`absolute inset-0 z-10 pointer-events-none flex flex-col ${px} ${isCover ? "justify-center" : "justify-end"}`}
         style={{ textAlign: ta }}>
         {!isCover && !isQuote && (
           <div className="rounded-full shrink-0"
@@ -236,7 +266,7 @@ export function SlideCanvas({ slide, index, editing = false, onUpdate, compact =
         )}
 
         {editing ? (
-          <div className="space-y-2 w-full">
+          <div className="space-y-2 w-full pointer-events-auto">
             <textarea
               value={slide.title || ""}
               onChange={(e) => onUpdate({ title: e.target.value })}
@@ -574,7 +604,7 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
     if (!selectedSlide) return;
     const saved = await updateSlide(selectedSlide._id, {
       imageUrl: photo.url, imageFilter: photo.filter || "original", imageOpacity: 1,
-      imagePositionX: 0, imagePositionY: 0, imageWidth: 100, imageHeight: 100,
+      imagePositionX: 0, imagePositionY: 0, imageWidth: 100, imageHeight: 100, imageRotation: 0,
     });
     if (!saved) return;
     setShowPhotoLibrary(false);
@@ -585,7 +615,7 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
     if (!selectedSlide?.imageUrl) return;
     const saved = await updateSlide(selectedSlide._id, {
       imageUrl: null, imageFilter: null, imageOpacity: null,
-      imagePositionX: null, imagePositionY: null, imageWidth: null, imageHeight: null,
+      imagePositionX: null, imagePositionY: null, imageWidth: null, imageHeight: null, imageRotation: null,
     });
     if (saved) toast.success("Image removed from this slide");
   };
@@ -593,7 +623,7 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
   const resetSlideImage = async () => {
     if (!selectedSlide?.imageUrl) return;
     const saved = await updateSlide(selectedSlide._id, {
-      imagePositionX: 0, imagePositionY: 0, imageWidth: 100, imageHeight: 100,
+      imagePositionX: 0, imagePositionY: 0, imageWidth: 100, imageHeight: 100, imageRotation: 0,
     });
     if (saved) toast.success("Image size and position reset");
   };
@@ -623,7 +653,7 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
       await saveImageAsset({ url: r.data.url, label: file.name || "Uploaded image", imageFilter: "original" });
       const saved = await updateSlide(slide._id, {
         imageUrl: r.data.url, imageFilter: "original", imageOpacity: 1,
-        imagePositionX: 0, imagePositionY: 0, imageWidth: 100, imageHeight: 100,
+        imagePositionX: 0, imagePositionY: 0, imageWidth: 100, imageHeight: 100, imageRotation: 0,
       });
       if (saved) toast.success("Image uploaded and saved to My uploads");
     } catch (err) { toast.error(err.message || "Upload failed"); }
@@ -837,7 +867,7 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
                   className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-25 transition-colors">
                   <ChevronRight className="h-4 w-4 text-slate-600" />
                 </button>
-                <span className="text-xs text-slate-400 hidden sm:block ml-1">· drag image to move · corner handle to resize</span>
+                <span className="text-xs text-slate-400 hidden sm:block ml-1">· drag image to move · corner handles to resize · rotate handle to rotate</span>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 sm:px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">

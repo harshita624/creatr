@@ -39,7 +39,7 @@ function SlideCard({ slide, index, total }) {
       {/* Background image */}
       {slide.imageUrl && (
         <Image src={slide.imageUrl} alt="" fill className="absolute object-cover"
-          style={{ left: `${slide.imagePositionX ?? 0}%`, top: `${slide.imagePositionY ?? 0}%`, width: `${slide.imageWidth ?? 100}%`, height: `${slide.imageHeight ?? 100}%`, opacity: slide.imageOpacity ?? 0.4, filter: getPhotoFilterCss(slide.imageFilter) }} />
+          style={{ left: `${slide.imagePositionX ?? 0}%`, top: `${slide.imagePositionY ?? 0}%`, width: `${slide.imageWidth ?? 100}%`, height: `${slide.imageHeight ?? 100}%`, opacity: slide.imageOpacity ?? 0.4, filter: getPhotoFilterCss(slide.imageFilter), transform: `rotate(${slide.imageRotation ?? 0}deg)`, transformOrigin: "center" }} />
       )}
       {/* Content */}
       <div className="relative z-10 flex h-full flex-col justify-end p-6 sm:p-8">

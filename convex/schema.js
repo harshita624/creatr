@@ -216,6 +216,7 @@ export default defineSchema({
     imagePositionY: v.optional(v.number()),
     imageWidth: v.optional(v.number()),
     imageHeight: v.optional(v.number()),
+    imageRotation: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

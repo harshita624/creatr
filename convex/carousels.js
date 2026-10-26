@@ -30,13 +30,14 @@ const slideValidator = {
   imagePositionY: v.optional(v.union(v.number(), v.null())),
   imageWidth: v.optional(v.union(v.number(), v.null())),
   imageHeight: v.optional(v.union(v.number(), v.null())),
+  imageRotation: v.optional(v.union(v.number(), v.null())),
 };
 
 const SLIDE_FIELDS = [
   "title", "caption", "imageUrl", "imageFilter", "layout", "template",
   "bgColor", "textColor", "accentColor",
   "fontSize", "textAlign", "imageOpacity",
-  "imagePositionX", "imagePositionY", "imageWidth", "imageHeight",
+  "imagePositionX", "imagePositionY", "imageWidth", "imageHeight", "imageRotation",
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -277,6 +278,7 @@ export const duplicateSlide = mutation({
       imagePositionY: slide.imagePositionY,
       imageWidth: slide.imageWidth,
       imageHeight: slide.imageHeight,
+      imageRotation: slide.imageRotation,
       createdAt:    now,
       updatedAt:    now,
     });
