@@ -19,6 +19,7 @@ const TYPE_META = {
   livestream: { label: "Live",     icon: Radio,        dot: "bg-red-500"     },
   podcast:    { label: "Podcast",  icon: Mic2,         dot: "bg-amber-500"   },
   carousel:   { label: "Carousel", icon: ImageIcon,    dot: "bg-emerald-500" },
+  photo:      { label: "Photo",    icon: ImageIcon,    dot: "bg-pink-500"     },
 };
 
 function startOfMonth(date) {
@@ -172,7 +173,7 @@ export default function CalendarPage() {
                     </div>
                     <div className="mt-0.5 space-y-0.5">
                       {dayPosts.slice(0, 2).map((post) => {
-                        const meta = TYPE_META[post.contentType || "article"];
+                        const meta = TYPE_META[post.contentType] || TYPE_META.article;
                         return (
                           <Link key={post._id}
                             href={`/dashboard/posts/edit/${post._id}`}
@@ -206,7 +207,7 @@ export default function CalendarPage() {
             ) : (
               <div className="space-y-2">
                 {monthPosts.map((post) => {
-                  const meta = TYPE_META[post.contentType || "article"];
+                  const meta = TYPE_META[post.contentType] || TYPE_META.article;
                   const Icon = meta.icon;
                   return (
                     <Link key={post._id}
