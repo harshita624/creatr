@@ -6,7 +6,7 @@ import {
   AlignCenter, AlignLeft, AlignRight, Check, Copy, Eye, EyeOff,
   LayoutTemplate, Loader2, Plus, Trash2, Upload,
   Layers, ChevronLeft, ChevronRight, Wand2, X,
-  Palette, Type, Sparkles,
+  Palette, Type, Sparkles, Maximize2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
@@ -200,9 +200,11 @@ export function SlideCanvas({ slide, index, editing = false, onUpdate, compact =
             style={{ filter: getPhotoFilterCss(slide.imageFilter) }} />
           {editing && (
             <button type="button" aria-label="Resize image" title="Drag to resize"
-              className="absolute bottom-1 right-1 z-30 h-4 w-4 rounded-full border-2 border-orange-500 bg-white shadow cursor-nwse-resize touch-none"
+              className="absolute bottom-1 right-1 z-30 flex h-6 w-6 items-center justify-center rounded-md border-2 border-orange-500 bg-white shadow cursor-nwse-resize touch-none"
               onPointerDown={(event) => startImageInteraction(event, "resize")}
-              onClick={(event) => event.stopPropagation()} />
+              onClick={(event) => event.stopPropagation()}>
+              <Maximize2 className="h-3 w-3 text-orange-600" />
+            </button>
           )}
         </div>
       )}
@@ -579,6 +581,23 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
     toast.success("Photo added to this slide");
   };
 
+  const removeSlideImage = async () => {
+    if (!selectedSlide?.imageUrl) return;
+    const saved = await updateSlide(selectedSlide._id, {
+      imageUrl: null, imageFilter: null, imageOpacity: null,
+      imagePositionX: null, imagePositionY: null, imageWidth: null, imageHeight: null,
+    });
+    if (saved) toast.success("Image removed from this slide");
+  };
+
+  const resetSlideImage = async () => {
+    if (!selectedSlide?.imageUrl) return;
+    const saved = await updateSlide(selectedSlide._id, {
+      imagePositionX: 0, imagePositionY: 0, imageWidth: 100, imageHeight: 100,
+    });
+    if (saved) toast.success("Image size and position reset");
+  };
+
   const copySlide = async (id) => {
     try { const cid = await duplicateSlide({ id }); setSelectedId(cid); toast.success("Duplicated"); }
     catch (err) { toast.error(err.message || "Failed"); }
@@ -818,7 +837,7 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
                   className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-25 transition-colors">
                   <ChevronRight className="h-4 w-4 text-slate-600" />
                 </button>
-                <span className="text-xs text-slate-300 hidden sm:block ml-1">· click text to edit</span>
+                <span className="text-xs text-slate-400 hidden sm:block ml-1">· drag image to move · corner handle to resize</span>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 sm:px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
@@ -830,6 +849,19 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
                   className="h-auto px-2.5 sm:px-3 py-1.5 text-xs rounded-xl border-slate-200">
                   My uploads ({uploadedPhotos.length})
                 </Button>
+                {selectedSlide.imageUrl && (
+                  <>
+                    <Button type="button" size="sm" variant="outline" onClick={resetSlideImage}
+                      title="Reset image position and size"
+                      className="h-auto px-2.5 sm:px-3 py-1.5 text-xs rounded-xl gap-1.5 border-slate-200">
+                      <Maximize2 className="h-3.5 w-3.5" />Reset image
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={removeSlideImage}
+                      className="h-auto px-2.5 sm:px-3 py-1.5 text-xs rounded-xl gap-1.5 border-red-100 text-red-500 hover:bg-red-50">
+                      <Trash2 className="h-3.5 w-3.5" />Remove image
+                    </Button>
+                  </>
+                )}
                 <Button type="button" size="sm" onClick={() => copySlide(selectedSlide._id)}
                   variant="outline" className="h-auto px-2.5 sm:px-3 py-1.5 text-xs rounded-xl gap-1.5 border-slate-200">
                   <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>

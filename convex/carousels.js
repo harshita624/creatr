@@ -7,8 +7,8 @@ import { mutation, query } from "./_generated/server";
 const slideValidator = {
   title:        v.optional(v.string()),
   caption:      v.optional(v.string()),
-  imageUrl:     v.optional(v.string()),
-  imageFilter:  v.optional(v.string()),
+  imageUrl:     v.optional(v.union(v.string(), v.null())),
+  imageFilter:  v.optional(v.union(v.string(), v.null())),
   layout: v.optional(
     v.union(
       v.literal("cover"),
@@ -25,11 +25,11 @@ const slideValidator = {
   accentColor:  v.optional(v.union(v.string(), v.null())),
   fontSize:     v.optional(v.string()),
   textAlign:    v.optional(v.string()),
-  imageOpacity: v.optional(v.number()),
-  imagePositionX: v.optional(v.number()),
-  imagePositionY: v.optional(v.number()),
-  imageWidth: v.optional(v.number()),
-  imageHeight: v.optional(v.number()),
+  imageOpacity: v.optional(v.union(v.number(), v.null())),
+  imagePositionX: v.optional(v.union(v.number(), v.null())),
+  imagePositionY: v.optional(v.union(v.number(), v.null())),
+  imageWidth: v.optional(v.union(v.number(), v.null())),
+  imageHeight: v.optional(v.union(v.number(), v.null())),
 };
 
 const SLIDE_FIELDS = [
