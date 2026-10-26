@@ -337,10 +337,27 @@ export const getUserPosts = query({
 });
 
 export const getById = query({
-  args: { id: v.id("posts") },
+  // Some older clients pass a bookmark row ID when opening a saved post.
+  // Resolve it here, while limiting bookmark-based access to the owner's own post.
+  args: { id: v.union(v.id("posts"), v.id("bookmarks")) },
   handler: async (ctx, args) => {
-    const post = await ctx.db.get(args.id);
-    if (!post) return null;
+    const record = await ctx.db.get(args.id);
+    if (!record) return null;
+
+    let post = record;
+    if ("postId" in record && "userId" in record) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) return null;
+
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+        .unique();
+      if (!user || record.userId !== user._id) return null;
+
+      post = await ctx.db.get(record.postId);
+      if (!post || post.authorId !== user._id) return null;
+    }
 
     return {
       ...post,
