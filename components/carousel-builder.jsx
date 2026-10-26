@@ -74,6 +74,82 @@ function resolveFonts(slide) {
 // state-driven sizing can — so this is safe on mobile.
 // ─────────────────────────────────────────────────────────────────────────────
 export function SlideCanvas({ slide, index, editing = false, onUpdate, compact = false }) {
+  const canvasRef = useRef(null);
+  const imageInteractionRef = useRef(null);
+  const [draftImageTransform, setDraftImageTransform] = useState(null);
+  const imageTransform = draftImageTransform?.slideId === slide._id && draftImageTransform?.imageUrl === slide.imageUrl
+    ? draftImageTransform.transform
+    : {
+        x: slide.imagePositionX ?? 0,
+        y: slide.imagePositionY ?? 0,
+        width: slide.imageWidth ?? 100,
+        height: slide.imageHeight ?? 100,
+      };
+
+  const startImageInteraction = (event, mode) => {
+    if (!editing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    imageInteractionRef.current = {
+      pointerId: event.pointerId,
+      mode,
+      startX: event.clientX,
+      startY: event.clientY,
+      rect,
+      base: imageTransform,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveImageInteraction = (event) => {
+    const interaction = imageInteractionRef.current;
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
+    const dx = ((event.clientX - interaction.startX) / interaction.rect.width) * 100;
+    const dy = ((event.clientY - interaction.startY) / interaction.rect.height) * 100;
+    const { base, mode } = interaction;
+    const next = mode === "resize"
+      ? {
+          ...base,
+          width: Math.max(12, Math.min(100 - base.x, base.width + dx)),
+          height: Math.max(12, Math.min(100 - base.y, base.height + dy)),
+        }
+      : {
+          ...base,
+          x: Math.max(0, Math.min(100 - base.width, base.x + dx)),
+          y: Math.max(0, Math.min(100 - base.height, base.y + dy)),
+        };
+    setDraftImageTransform({ slideId: slide._id, imageUrl: slide.imageUrl, transform: next });
+  };
+
+  const finishImageInteraction = (event) => {
+    const interaction = imageInteractionRef.current;
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
+    const dx = ((event.clientX - interaction.startX) / interaction.rect.width) * 100;
+    const dy = ((event.clientY - interaction.startY) / interaction.rect.height) * 100;
+    const { base, mode } = interaction;
+    const next = mode === "resize"
+      ? {
+          ...base,
+          width: Math.max(12, Math.min(100 - base.x, base.width + dx)),
+          height: Math.max(12, Math.min(100 - base.y, base.height + dy)),
+        }
+      : {
+          ...base,
+          x: Math.max(0, Math.min(100 - base.width, base.x + dx)),
+          y: Math.max(0, Math.min(100 - base.height, base.y + dy)),
+        };
+    setDraftImageTransform({ slideId: slide._id, imageUrl: slide.imageUrl, transform: next });
+    imageInteractionRef.current = null;
+    onUpdate?.({
+      imagePositionX: Number(next.x.toFixed(2)),
+      imagePositionY: Number(next.y.toFixed(2)),
+      imageWidth: Number(next.width.toFixed(2)),
+      imageHeight: Number(next.height.toFixed(2)),
+    });
+  };
+
   const s  = resolveSlideStyle(slide);
   const f  = resolveFonts(slide);
   const ta = slide.textAlign || "left";
@@ -101,15 +177,36 @@ export function SlideCanvas({ slide, index, editing = false, onUpdate, compact =
 
   return (
     <div
+      ref={canvasRef}
       className="relative w-full overflow-hidden rounded-2xl shadow-lg"
       style={{ aspectRatio: "4/5", color: s.text, ...bgStyle }}
     >
       {slide.imageUrl && (
-        <img src={slide.imageUrl} alt=""
-          className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-          style={{ opacity: slide.imageOpacity ?? 0.18, filter: getPhotoFilterCss(slide.imageFilter) }} />
+        <div
+          className={`absolute touch-none ${editing ? "z-10 cursor-move" : "pointer-events-none"}`}
+          style={{
+            left: `${imageTransform.x}%`, top: `${imageTransform.y}%`,
+            width: `${imageTransform.width}%`, height: `${imageTransform.height}%`,
+            opacity: slide.imageOpacity ?? 0.18,
+            border: editing ? "1px dashed rgba(249,115,22,.9)" : "none",
+          }}
+          onPointerDown={(event) => startImageInteraction(event, "move")}
+          onPointerMove={moveImageInteraction}
+          onPointerUp={finishImageInteraction}
+          onPointerCancel={finishImageInteraction}
+          title={editing ? "Drag to move; drag the corner to resize" : undefined}
+        >
+          <img src={slide.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+            style={{ filter: getPhotoFilterCss(slide.imageFilter) }} />
+          {editing && (
+            <button type="button" aria-label="Resize image" title="Drag to resize"
+              className="absolute bottom-1 right-1 z-30 h-4 w-4 rounded-full border-2 border-orange-500 bg-white shadow cursor-nwse-resize touch-none"
+              onPointerDown={(event) => startImageInteraction(event, "resize")}
+              onClick={(event) => event.stopPropagation()} />
+          )}
+        </div>
       )}
-      <div className="absolute inset-0 pointer-events-none"
+      <div className="absolute inset-0 z-[1] pointer-events-none"
         style={{ background: `radial-gradient(circle at 80% 10%, ${s.accent}28 0%, transparent 55%)` }} />
 
       {/* Slide number */}
@@ -395,7 +492,8 @@ function DesignToolbar({ slide, onUpdate }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CarouselBuilder({ postId, title, content, onEnsureDraft }) {
   const slides           = useQuery(api.carousels.listSlides, postId ? { postId } : "skip");
-  const userPosts        = useQuery(api.posts.getUserPosts, {});
+  const uploadedPhotos   = useQuery(api.carousels.getMyUploads) || [];
+  const saveImageAsset   = useMutation(api.carousels.saveImageAsset);
   const createSlide      = useMutation(api.carousels.createSlide);
   const createManySlides = useMutation(api.carousels.createManySlides);
   const updateSlideMut   = useMutation(api.carousels.updateSlide);
@@ -419,16 +517,6 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
   );
   const selectedSlide = sortedSlides.find((s) => s._id === selectedId) || sortedSlides[0];
   const selectedIdx   = sortedSlides.findIndex((s) => s._id === selectedSlide?._id);
-  const uploadedPhotos = useMemo(() => {
-    const photos = [];
-    for (const post of userPosts || []) {
-      for (const [index, photo] of (post.photoItems || []).entries()) {
-        if (photo.url) photos.push({ url: photo.url, filter: photo.filter || "original", label: `${post.title || "Photo post"} · ${index + 1}` });
-      }
-      if (post.featuredImage) photos.push({ url: post.featuredImage, filter: "original", label: `${post.title || "Post"} · cover` });
-    }
-    return [...new Map(photos.map((photo) => [photo.url, photo])).values()];
-  }, [userPosts]);
 
   const ensurePost = async () => {
     const id = postId || (await onEnsureDraft?.());
@@ -482,7 +570,10 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
 
   const selectLibraryPhoto = async (photo) => {
     if (!selectedSlide) return;
-    const saved = await updateSlide(selectedSlide._id, { imageUrl: photo.url, imageFilter: photo.filter || "original" });
+    const saved = await updateSlide(selectedSlide._id, {
+      imageUrl: photo.url, imageFilter: photo.filter || "original", imageOpacity: 1,
+      imagePositionX: 0, imagePositionY: 0, imageWidth: 100, imageHeight: 100,
+    });
     if (!saved) return;
     setShowPhotoLibrary(false);
     toast.success("Photo added to this slide");
@@ -510,8 +601,12 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
     try {
       const r = await uploadToImageKit(file, `carousel-${Date.now()}-${file.name}`, "creator-media");
       if (!r.success) throw new Error(r.error || "Upload failed");
-      const saved = await updateSlide(slide._id, { imageUrl: r.data.url, imageFilter: "original" });
-      if (saved) toast.success("Image uploaded to slide");
+      await saveImageAsset({ url: r.data.url, label: file.name || "Uploaded image", imageFilter: "original" });
+      const saved = await updateSlide(slide._id, {
+        imageUrl: r.data.url, imageFilter: "original", imageOpacity: 1,
+        imagePositionX: 0, imagePositionY: 0, imageWidth: 100, imageHeight: 100,
+      });
+      if (saved) toast.success("Image uploaded and saved to My uploads");
     } catch (err) { toast.error(err.message || "Upload failed"); }
     finally { setUploadingId(null); e.target.value = ""; }
   };
@@ -755,7 +850,7 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-bold text-slate-800">Choose a photo for this slide</p>
-                    <p className="text-xs text-slate-500">Photos from your saved Photo posts and post covers.</p>
+                    <p className="text-xs text-slate-500">Your uploads, carousel images, Photo posts, and post covers.</p>
                   </div>
                   <button type="button" onClick={() => setShowPhotoLibrary(false)} className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-white">Close</button>
                 </div>
@@ -770,7 +865,7 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
                     ))}
                   </div>
                 ) : (
-                  <p className="rounded-xl bg-white p-4 text-sm text-slate-500">No saved photos yet. Upload a photo in a Photo post and save the draft, or upload one directly to this slide.</p>
+                  <p className="rounded-xl bg-white p-4 text-sm text-slate-500">No uploads yet. Upload an image to this slide or add photos to a Photo post; they will appear here for reuse.</p>
                 )}
               </div>
             )}

@@ -212,12 +212,27 @@ export default defineSchema({
     fontSize: v.optional(v.string()),
     textAlign: v.optional(v.string()),
     imageOpacity: v.optional(v.number()),
+    imagePositionX: v.optional(v.number()),
+    imagePositionY: v.optional(v.number()),
+    imageWidth: v.optional(v.number()),
+    imageHeight: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_owner", ["ownerId"])
     .index("by_post", ["postId"])
     .index("by_post_order", ["postId", "order"]),
+
+  mediaAssets: defineTable({
+    ownerId: v.id("users"),
+    url: v.string(),
+    label: v.string(),
+    imageFilter: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_owner_url", ["ownerId", "url"]),
 
   trends: defineTable({
     trending_hashtags: v.array(v.object({ tag: v.string(), count: v.number(), engagement: v.number(), trend_score: v.number() })),

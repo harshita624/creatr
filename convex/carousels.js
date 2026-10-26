@@ -26,12 +26,17 @@ const slideValidator = {
   fontSize:     v.optional(v.string()),
   textAlign:    v.optional(v.string()),
   imageOpacity: v.optional(v.number()),
+  imagePositionX: v.optional(v.number()),
+  imagePositionY: v.optional(v.number()),
+  imageWidth: v.optional(v.number()),
+  imageHeight: v.optional(v.number()),
 };
 
 const SLIDE_FIELDS = [
   "title", "caption", "imageUrl", "imageFilter", "layout", "template",
   "bgColor", "textColor", "accentColor",
   "fontSize", "textAlign", "imageOpacity",
+  "imagePositionX", "imagePositionY", "imageWidth", "imageHeight",
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,6 +81,69 @@ export const listSlides = query({
   handler: async (ctx, args) => {
     await assertPostOwner(ctx, args.postId);
     return getSlides(ctx, args.postId);
+  },
+});
+
+export const getMyUploads = query({
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) return [];
+
+    const [assets, slides, posts] = await Promise.all([
+      ctx.db.query("mediaAssets").withIndex("by_owner", (q) => q.eq("ownerId", user._id)).order("desc").take(200),
+      ctx.db.query("carouselSlides").withIndex("by_owner", (q) => q.eq("ownerId", user._id)).order("desc").take(200),
+      ctx.db.query("posts").withIndex("by_author", (q) => q.eq("authorId", user._id)).order("desc").take(200),
+    ]);
+
+    const photos = [];
+    for (const asset of assets) {
+      photos.push({ url: asset.url, filter: asset.imageFilter || "original", label: asset.label || "Uploaded image", createdAt: asset.updatedAt });
+    }
+    for (const slide of slides) {
+      if (slide.imageUrl) photos.push({ url: slide.imageUrl, filter: slide.imageFilter || "original", label: `${slide.title || "Carousel slide"} · slide`, createdAt: slide.updatedAt });
+    }
+    for (const post of posts) {
+      for (const [index, photo] of (post.photoItems || []).entries()) {
+        if (photo.url) photos.push({ url: photo.url, filter: photo.filter || "original", label: `${post.title || "Photo post"} · ${index + 1}`, createdAt: post.updatedAt || post.createdAt });
+      }
+      if (post.featuredImage) photos.push({ url: post.featuredImage, filter: "original", label: `${post.title || "Post"} · cover`, createdAt: post.updatedAt || post.createdAt });
+    }
+
+    return [...new Map(photos.map((photo) => [photo.url, photo])).values()]
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  },
+});
+
+export const saveImageAsset = mutation({
+  args: { url: v.string(), label: v.string(), imageFilter: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Not authenticated");
+
+    let parsedUrl;
+    try { parsedUrl = new URL(args.url); } catch { throw new Error("Invalid image URL"); }
+    if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "ik.imagekit.io") {
+      throw new Error("Only uploaded ImageKit images can be saved to My uploads");
+    }
+
+    const existing = await ctx.db
+      .query("mediaAssets")
+      .withIndex("by_owner_url", (q) => q.eq("ownerId", user._id).eq("url", args.url))
+      .unique();
+    const now = Date.now();
+    if (existing) {
+      await ctx.db.patch(existing._id, { label: args.label, imageFilter: args.imageFilter, updatedAt: now });
+      return existing._id;
+    }
+
+    return ctx.db.insert("mediaAssets", {
+      ownerId: user._id,
+      url: args.url,
+      label: args.label,
+      imageFilter: args.imageFilter,
+      createdAt: now,
+      updatedAt: now,
+    });
   },
 });
 
@@ -205,6 +273,10 @@ export const duplicateSlide = mutation({
       fontSize:     slide.fontSize,
       textAlign:    slide.textAlign,
       imageOpacity: slide.imageOpacity,
+      imagePositionX: slide.imagePositionX,
+      imagePositionY: slide.imagePositionY,
+      imageWidth: slide.imageWidth,
+      imageHeight: slide.imageHeight,
       createdAt:    now,
       updatedAt:    now,
     });

@@ -93,7 +93,7 @@ function FeedSlidePreview({ slide, index, total }) {
     <div style={{ position: "absolute", inset: 0, background: slide.bgColor || s.bg, overflow: "hidden" }}>
       {slide.imageUrl && (
         <img src={slide.imageUrl} alt=""
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: slide.imageOpacity ?? 0.35, filter: getPhotoFilterCss(slide.imageFilter) }} />
+          style={{ position: "absolute", left: `${slide.imagePositionX ?? 0}%`, top: `${slide.imagePositionY ?? 0}%`, width: `${slide.imageWidth ?? 100}%`, height: `${slide.imageHeight ?? 100}%`, objectFit: "cover", opacity: slide.imageOpacity ?? 0.35, filter: getPhotoFilterCss(slide.imageFilter) }} />
       )}
       <div style={{ position: "absolute", inset: 0, padding: "clamp(12px,5%,28px)", display: "flex", flexDirection: "column", justifyContent: slide.layout === "cover" ? "center" : "flex-end" }}>
         <p style={{ margin: 0, fontSize: 9, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.15em", color: slide.accentColor || s.accent, marginBottom: 6 }}>
