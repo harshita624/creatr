@@ -200,6 +200,7 @@ export default defineSchema({
     title: v.string(),
     caption: v.string(),
     imageUrl: v.optional(v.string()),
+    imageFilter: v.optional(v.string()),
     layout: v.union(
       v.literal("cover"), v.literal("split"),
       v.literal("quote"), v.literal("stat"), v.literal("cta")

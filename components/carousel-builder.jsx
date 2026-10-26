@@ -13,6 +13,7 @@ import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { uploadToImageKit } from "@/lib/imagekit";
+import { getPhotoFilterCss, PHOTO_FILTERS } from "@/lib/photo-filters";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -106,7 +107,7 @@ export function SlideCanvas({ slide, index, editing = false, onUpdate, compact =
       {slide.imageUrl && (
         <img src={slide.imageUrl} alt=""
           className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-          style={{ opacity: slide.imageOpacity ?? 0.18 }} />
+          style={{ opacity: slide.imageOpacity ?? 0.18, filter: getPhotoFilterCss(slide.imageFilter) }} />
       )}
       <div className="absolute inset-0 pointer-events-none"
         style={{ background: `radial-gradient(circle at 80% 10%, ${s.accent}28 0%, transparent 55%)` }} />
@@ -353,6 +354,19 @@ function DesignToolbar({ slide, onUpdate }) {
               onChange={(v) => onUpdate({ accentColor: v })}
               presets={COLOR_PRESETS.accent} />
           </div>
+          {slide.imageUrl && (
+            <div className="mt-3">
+              <p className="mb-2 text-xs font-semibold text-slate-500">Photo filter</p>
+              <div className="flex flex-wrap gap-1.5">
+                {PHOTO_FILTERS.map((filter) => (
+                  <button key={filter.id} type="button" onClick={() => onUpdate({ imageFilter: filter.id })}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${(slide.imageFilter || "original") === filter.id ? "border-orange-500 bg-orange-50 text-orange-700" : "border-slate-200 text-slate-600 hover:border-orange-300"}`}>
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3 pt-3 border-t border-slate-100">
             <div className="flex items-center gap-2 flex-1 min-w-[160px]">
               <span className="text-xs text-slate-500 shrink-0">Image opacity</span>
@@ -381,6 +395,7 @@ function DesignToolbar({ slide, onUpdate }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CarouselBuilder({ postId, title, content, onEnsureDraft }) {
   const slides           = useQuery(api.carousels.listSlides, postId ? { postId } : "skip");
+  const userPosts        = useQuery(api.posts.getUserPosts, {});
   const createSlide      = useMutation(api.carousels.createSlide);
   const createManySlides = useMutation(api.carousels.createManySlides);
   const updateSlideMut   = useMutation(api.carousels.updateSlide);
@@ -396,6 +411,7 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
   const [aiTopic,         setAiTopic]          = useState("");
   const [slideCount,      setSlideCount]       = useState(6);
   const [confirmDeleteId, setConfirmDeleteId]  = useState(null);
+  const [showPhotoLibrary, setShowPhotoLibrary] = useState(false);
 
   const sortedSlides = useMemo(
     () => [...(slides || [])].sort((a, b) => a.order - b.order),
@@ -403,6 +419,16 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
   );
   const selectedSlide = sortedSlides.find((s) => s._id === selectedId) || sortedSlides[0];
   const selectedIdx   = sortedSlides.findIndex((s) => s._id === selectedSlide?._id);
+  const uploadedPhotos = useMemo(() => {
+    const photos = [];
+    for (const post of userPosts || []) {
+      for (const [index, photo] of (post.photoItems || []).entries()) {
+        if (photo.url) photos.push({ url: photo.url, filter: photo.filter || "original", label: `${post.title || "Photo post"} · ${index + 1}` });
+      }
+      if (post.featuredImage) photos.push({ url: post.featuredImage, filter: "original", label: `${post.title || "Post"} · cover` });
+    }
+    return [...new Map(photos.map((photo) => [photo.url, photo])).values()];
+  }, [userPosts]);
 
   const ensurePost = async () => {
     const id = postId || (await onEnsureDraft?.());
@@ -450,8 +476,16 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
   };
 
   const updateSlide = async (id, patch) => {
-    try { await updateSlideMut({ id, ...patch }); }
-    catch (err) { toast.error(err.message || "Failed to update"); }
+    try { await updateSlideMut({ id, ...patch }); return true; }
+    catch (err) { toast.error(err.message || "Failed to update"); return false; }
+  };
+
+  const selectLibraryPhoto = async (photo) => {
+    if (!selectedSlide) return;
+    const saved = await updateSlide(selectedSlide._id, { imageUrl: photo.url, imageFilter: photo.filter || "original" });
+    if (!saved) return;
+    setShowPhotoLibrary(false);
+    toast.success("Photo added to this slide");
   };
 
   const copySlide = async (id) => {
@@ -476,8 +510,8 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
     try {
       const r = await uploadToImageKit(file, `carousel-${Date.now()}-${file.name}`, "creator-media");
       if (!r.success) throw new Error(r.error || "Upload failed");
-      await updateSlide(slide._id, { imageUrl: r.data.url });
-      toast.success("Image uploaded");
+      const saved = await updateSlide(slide._id, { imageUrl: r.data.url, imageFilter: "original" });
+      if (saved) toast.success("Image uploaded to slide");
     } catch (err) { toast.error(err.message || "Upload failed"); }
     finally { setUploadingId(null); e.target.value = ""; }
   };
@@ -573,6 +607,7 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
           <div>
             <p className="text-xs font-black uppercase tracking-widest text-slate-400">Carousel</p>
             <p className="text-sm font-bold text-slate-800">{sortedSlides.length} slide{sortedSlides.length !== 1 ? "s" : ""}</p>
+            <p className="text-[11px] text-slate-500">Upload to a slide or choose from My uploads.</p>
           </div>
           {/* AI bar — desktop only */}
           <div className="hidden lg:flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5">
@@ -624,7 +659,7 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
                   }`}
                   style={{ aspectRatio: "4/5", ...bgSt }}>
                   {slide.imageUrl && (
-                    <img src={slide.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.18 }} />
+                    <img src={slide.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.18, filter: getPhotoFilterCss(slide.imageFilter) }} />
                   )}
                   <div className="absolute inset-0"
                     style={{ background: `radial-gradient(circle at 80% 10%, ${s.accent}38 0%, transparent 60%)` }} />
@@ -693,9 +728,13 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
               <div className="flex flex-wrap items-center gap-1.5">
                 <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 sm:px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                   <Upload className="h-3.5 w-3.5" />
-                  {uploadingId === selectedSlide._id ? "Uploading…" : "Image"}
+                  {uploadingId === selectedSlide._id ? "Uploading…" : "Upload to slide"}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadImage(selectedSlide, e)} />
                 </label>
+                <Button type="button" size="sm" variant="outline" onClick={() => setShowPhotoLibrary((open) => !open)}
+                  className="h-auto px-2.5 sm:px-3 py-1.5 text-xs rounded-xl border-slate-200">
+                  My uploads ({uploadedPhotos.length})
+                </Button>
                 <Button type="button" size="sm" onClick={() => copySlide(selectedSlide._id)}
                   variant="outline" className="h-auto px-2.5 sm:px-3 py-1.5 text-xs rounded-xl gap-1.5 border-slate-200">
                   <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -710,6 +749,31 @@ export default function CarouselBuilder({ postId, title, content, onEnsureDraft 
                 </Button>
               </div>
             </div>
+
+            {showPhotoLibrary && (
+              <div className="border-b border-slate-100 bg-slate-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">Choose a photo for this slide</p>
+                    <p className="text-xs text-slate-500">Photos from your saved Photo posts and post covers.</p>
+                  </div>
+                  <button type="button" onClick={() => setShowPhotoLibrary(false)} className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-white">Close</button>
+                </div>
+                {uploadedPhotos.length ? (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                    {uploadedPhotos.map((photo) => (
+                      <button key={photo.url} type="button" onClick={() => selectLibraryPhoto(photo)} title={photo.label}
+                        className="group overflow-hidden rounded-xl border border-slate-200 bg-white text-left hover:border-orange-400">
+                        <img src={photo.url} alt={photo.label} className="aspect-square w-full object-cover" style={{ filter: getPhotoFilterCss(photo.filter) }} />
+                        <span className="block truncate px-2 py-1.5 text-[10px] font-medium text-slate-600">{photo.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-xl bg-white p-4 text-sm text-slate-500">No saved photos yet. Upload a photo in a Photo post and save the draft, or upload one directly to this slide.</p>
+                )}
+              </div>
+            )}
 
             {/* Canvas — dot-grid, padding shrinks on mobile via CSS only */}
             <div className="flex flex-1 items-center justify-center overflow-hidden p-4 sm:p-6 lg:p-10"

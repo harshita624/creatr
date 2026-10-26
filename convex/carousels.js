@@ -8,6 +8,7 @@ const slideValidator = {
   title:        v.optional(v.string()),
   caption:      v.optional(v.string()),
   imageUrl:     v.optional(v.string()),
+  imageFilter:  v.optional(v.string()),
   layout: v.optional(
     v.union(
       v.literal("cover"),
@@ -28,7 +29,7 @@ const slideValidator = {
 };
 
 const SLIDE_FIELDS = [
-  "title", "caption", "imageUrl", "layout", "template",
+  "title", "caption", "imageUrl", "imageFilter", "layout", "template",
   "bgColor", "textColor", "accentColor",
   "fontSize", "textAlign", "imageOpacity",
 ];
@@ -95,6 +96,7 @@ export const createSlide = mutation({
       title:    args.title   ?? `Slide ${slides.length + 1}`,
       caption:  args.caption ?? "",
       imageUrl: args.imageUrl || undefined,
+      imageFilter: args.imageFilter || undefined,
       layout:   args.layout   ?? (slides.length === 0 ? "cover" : "split"),
       template: args.template ?? "clean",
       createdAt: now,
@@ -111,6 +113,7 @@ export const createManySlides = mutation({
         title:    v.string(),
         caption:  v.string(),
         imageUrl: v.optional(v.string()),
+        imageFilter: v.optional(v.string()),
         layout: v.union(
           v.literal("cover"),
           v.literal("split"),
@@ -137,6 +140,7 @@ export const createManySlides = mutation({
           title:    slide.title,
           caption:  slide.caption,
           imageUrl: slide.imageUrl || undefined,
+          imageFilter: slide.imageFilter || undefined,
           layout:   slide.layout,
           template: slide.template ?? "clean",
           createdAt: now,
@@ -192,6 +196,7 @@ export const duplicateSlide = mutation({
       title:        `${slide.title} copy`,
       caption:      slide.caption,
       imageUrl:     slide.imageUrl,
+      imageFilter:  slide.imageFilter,
       layout:       slide.layout,
       template:     slide.template,
       bgColor:      slide.bgColor,

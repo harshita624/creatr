@@ -42,7 +42,6 @@ const MEDIA_SETTINGS = {
   video:      { icon: Video,     title: "Video source",    accept: "video/*", placeholder: "Paste a video URL..."     },
   livestream: { icon: Radio,     title: "Livestream link", accept: "",        placeholder: "Paste your live URL..."   },
   podcast:    { icon: Mic2,      title: "Podcast audio",   accept: "audio/*", placeholder: "Paste episode URL..."    },
-  carousel:   { icon: ImageIcon, title: "Carousel images", accept: "image/*", placeholder: "Paste an image URL..."   },
 };
 
 /* Inline toggle matching CreateK's orange→violet gradient */
